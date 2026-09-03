@@ -1,0 +1,47 @@
+authority_version: '2026.08.29-1'
+
+discount:
+  max_pct: 10
+  max_paise: 200000
+
+extension:
+  max_days: 14
+
+promises:
+  max_per_case: 2
+  grace_hours: 24
+
+budgets:
+  max_touches_per_case: 6
+  max_retries_per_case: 4
+  max_ptp_per_case: 2
+
+allocation:
+  max_actions_per_cycle: 150
+  max_contacts_per_cycle: 80
+  max_spend_per_cycle_paise: 400000
+
+thresholds:
+  auto_write_off_below_paise: 5000
+  human_approval_required_above_paise: 5000000
+  case_age_limit_days: 90
+
+cadence:
+  after_execute_hours: 6
+  after_wait_hours: 24
+  attribution_window_hours: 72
+
+escalation:
+  rungs:
+    - name: SILENT_RETRY
+      min_dwell_days: 0
+    - name: GENTLE_REMINDER
+      min_dwell_days: 1
+    - name: FIRM_REMINDER
+      min_dwell_days: 3
+    - name: OFFER
+      min_dwell_days: 3
+    - name: HUMAN_CONTACT
+      min_dwell_days: 5
+    - name: FORMAL_NOTICE
+      min_dwell_days: 7

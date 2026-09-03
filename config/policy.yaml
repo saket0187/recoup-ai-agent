@@ -1,0 +1,284 @@
+policy_version: '2026.08.29-1'
+
+rules:
+  - id: QUIET_HOURS
+    category: timing
+    applies_to:
+      [
+        SEND_NUDGE,
+        SEND_PAYMENT_LINK,
+        SEND_PRE_DEBIT_NOTICE,
+        ESCALATE_CONTACT,
+        OFFER_DISCOUNT,
+        OFFER_PLAN,
+        OFFER_PART_PAYMENT,
+        REQUEST_INSTRUMENT_UPDATE,
+        MANDATE_REPAIR,
+        OFFER_METHOD_SWITCH,
+        GRANT_EXTENSION,
+      ]
+    on_fail: DEFER
+    params:
+      start_hour: 9
+      end_hour: 20
+    grounding:
+      - source: TRAI TCCCPR commercial communication hours
+        human_verified: false
+
+  - id: GOOD_PAYER_GRACE
+    category: timing
+    applies_to:
+      [
+        SEND_NUDGE,
+        SEND_PAYMENT_LINK,
+        SEND_PRE_DEBIT_NOTICE,
+        ESCALATE_CONTACT,
+        OFFER_DISCOUNT,
+        OFFER_PLAN,
+        OFFER_PART_PAYMENT,
+        REQUEST_INSTRUMENT_UPDATE,
+        MANDATE_REPAIR,
+        OFFER_METHOD_SWITCH,
+        GRANT_EXTENSION,
+      ]
+    on_fail: DEFER
+    params:
+      min_prior_cases: 3
+      min_recovery_rate: 0.8
+      grace_days: 3
+    grounding:
+      - source: Proportionality in recovery contact toward a reliable payer who is briefly late
+        human_verified: false
+
+  - id: RECOVERY_CALL_HOURS
+    category: timing
+    applies_to: [ESCALATE_HUMAN]
+    on_fail: DEFER
+    params:
+      start_hour: 8
+      end_hour: 19
+    grounding:
+      - source: RBI fair practice guidance on recovery agent contact hours
+        human_verified: false
+
+  - id: NO_HOLIDAY_DUNNING
+    category: timing
+    applies_to: [SEND_NUDGE, ESCALATE_CONTACT, ESCALATE_HUMAN, OFFER_DISCOUNT]
+    on_fail: DEFER
+    params: {}
+
+  - id: BANK_HOLIDAY_MANDATE
+    category: timing
+    applies_to: [RETRY_CHARGE, RETRY_CHARGE_ALT_ROUTE, SPLIT_RETRY]
+    on_fail: DEFER
+    params: {}
+
+  - id: CONSENT_REQUIRED
+    category: consent
+    applies_to:
+      [
+        SEND_NUDGE,
+        SEND_PAYMENT_LINK,
+        SEND_PRE_DEBIT_NOTICE,
+        ESCALATE_CONTACT,
+        ESCALATE_HUMAN,
+        OFFER_DISCOUNT,
+        OFFER_PLAN,
+        OFFER_PART_PAYMENT,
+        REQUEST_INSTRUMENT_UPDATE,
+        MANDATE_REPAIR,
+        OFFER_METHOD_SWITCH,
+        GRANT_EXTENSION,
+      ]
+    on_fail: DENY
+    params: {}
+
+  - id: OPT_OUT_ABSOLUTE
+    category: consent
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params: {}
+
+  - id: DND_SCRUB
+    category: consent
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params:
+      restricted_channels: [SMS, VOICE]
+
+  - id: PROMO_RECLASSIFY
+    category: consent
+    applies_to: [OFFER_DISCOUNT]
+    on_fail: DEFER
+    params:
+      promo_start_hour: 10
+      promo_end_hour: 19
+
+  - id: WA_SESSION_WINDOW
+    category: consent
+    applies_to: ALL_CONTACT
+    on_fail: MODIFY
+    params:
+      session_hours: 24
+
+  - id: FREQ_PER_CHANNEL_DAY
+    category: frequency
+    applies_to: ALL_CONTACT
+    on_fail: DEFER
+    params:
+      max_per_channel_24h: 1
+
+  - id: FREQ_PER_CASE_WEEK
+    category: frequency
+    applies_to: ALL_CONTACT
+    on_fail: DEFER
+    params:
+      max_per_case_7d: 3
+
+  - id: FREQ_GLOBAL_CUSTOMER_WEEK
+    category: frequency
+    applies_to: ALL_CONTACT
+    on_fail: DEFER
+    params:
+      max_per_customer_7d: 4
+
+  - id: MIN_GAP_BETWEEN_TOUCHES
+    category: frequency
+    applies_to: ALL_CONTACT
+    on_fail: DEFER
+    params:
+      min_gap_hours: 24
+
+  - id: ESCALATION_ORDER
+    category: escalation
+    applies_to: ALL
+    on_fail: DENY
+    params: {}
+
+  - id: ESCALATION_COOLDOWN
+    category: escalation
+    applies_to: ALL
+    on_fail: DEFER
+    params: {}
+
+  - id: NO_ESCALATION_DURING_PTP
+    category: escalation
+    applies_to: ALL_CONTACT
+    on_fail: DEFER
+    params: {}
+
+  - id: NO_ESCALATION_DURING_DISPUTE
+    category: escalation
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params: {}
+
+  - id: THIRD_PARTY_DISCLOSURE
+    category: escalation
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params: {}
+
+  - id: NO_THREATS
+    category: content
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params: {}
+
+  - id: NO_LEGAL_IMPERSONATION
+    category: content
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params:
+      allowed_from_rung: FORMAL_NOTICE
+
+  - id: NO_DARK_PATTERNS
+    category: content
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params: {}
+
+  - id: NO_SHAMING
+    category: content
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params: {}
+
+  - id: LANGUAGE_MATCH
+    category: content
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params: {}
+
+  - id: AMOUNT_ACCURACY
+    category: content
+    applies_to: ALL_CONTACT
+    on_fail: DENY
+    params: {}
+
+  - id: PII_MINIMISATION
+    category: data_protection
+    applies_to: ALL
+    on_fail: DENY
+    params: {}
+
+  - id: PURPOSE_LIMITATION
+    category: data_protection
+    applies_to: ALL
+    on_fail: DENY
+    params:
+      required_purpose: payment_recovery
+
+  - id: ERASURE_HONOURED
+    category: data_protection
+    applies_to: ALL
+    on_fail: DENY
+    params: {}
+
+  - id: PRE_DEBIT_NOTICE
+    category: money_safety
+    applies_to: [RETRY_CHARGE, RETRY_CHARGE_ALT_ROUTE, SPLIT_RETRY]
+    on_fail: DEFER
+    params:
+      notice_hours: 24
+      mandate_methods: [emandate, nach]
+    grounding:
+      - source: RBI e-mandate framework, pre-debit notification
+        human_verified: false
+
+  - id: MANDATE_CAP
+    category: money_safety
+    applies_to: [RETRY_CHARGE, RETRY_CHARGE_ALT_ROUTE]
+    on_fail: MODIFY
+    params: {}
+
+  - id: NETWORK_ATTEMPT_CAP
+    category: money_safety
+    applies_to: [RETRY_CHARGE, RETRY_CHARGE_ALT_ROUTE, SPLIT_RETRY]
+    on_fail: DENY
+    params:
+      max_attempts_30d: 12
+
+  - id: NO_RETRY_INTO_DOWNTIME
+    category: money_safety
+    applies_to: [RETRY_CHARGE, RETRY_CHARGE_ALT_ROUTE, SPLIT_RETRY]
+    on_fail: DEFER
+    params: {}
+
+  - id: DISCOUNT_WITHIN_AUTHORITY
+    category: money_safety
+    applies_to: [OFFER_DISCOUNT]
+    on_fail: DENY
+    params: {}
+
+  - id: EXTENSION_WITHIN_AUTHORITY
+    category: money_safety
+    applies_to: [GRANT_EXTENSION]
+    on_fail: DENY
+    params: {}
+
+  - id: HUMAN_APPROVAL_ABOVE_CEILING
+    category: money_safety
+    applies_to: ALL
+    on_fail: DENY
+    params: {}

@@ -1,0 +1,1 @@
+ALTER TABLE `merchants` ADD `tick_lease_until` integer;

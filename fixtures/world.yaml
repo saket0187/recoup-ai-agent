@@ -1,0 +1,41 @@
+timezone: Asia/Kolkata
+start_date: '2026-09-01'
+duration_days: 45
+
+events:
+  - kind: gateway_downtime
+    name: HDFC UPI degradation
+    method: upi
+    issuer: HDFC
+    start: day 3 14:20
+    end: day 3 16:05
+    severity: 0.94
+
+  - kind: bank_holiday
+    name: Public holiday
+    start: day 7 00:00
+    end: day 7 23:59
+
+  - kind: festival
+    name: Festival week
+    start: day 12 00:00
+    end: day 16 23:59
+
+  - kind: merchant_defect
+    name: Bad deploy emitting malformed amounts
+    reason: input_validation_failed
+    start: day 5 11:00
+    end: day 5 11:40
+
+  - kind: gateway_downtime
+    name: Low-volume netbanking blip
+    method: netbanking
+    issuer: YES
+    start: day 21 03:10
+    end: day 21 04:00
+    severity: 0.8
+
+  - kind: bank_holiday
+    name: Public holiday
+    start: day 33 00:00
+    end: day 33 23:59

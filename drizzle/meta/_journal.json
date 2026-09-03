@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788020703814,
+      "tag": "0000_initial_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788178124421,
+      "tag": "0001_customer_payment_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788335796562,
+      "tag": "0002_drop_unused_decision_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788335904662,
+      "tag": "0003_bandit_arms",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788341138908,
+      "tag": "0004_action_best_remaining_ev",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788341360187,
+      "tag": "0005_merchant_tick_lease",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788356864598,
+      "tag": "0006_denormalise_merchant_id",
+      "breakpoints": true
+    }
+  ]
+}

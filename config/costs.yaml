@@ -1,0 +1,45 @@
+costs_version: '2026.08.29-1'
+
+margin_rate_bp: 3000
+
+channels:
+  SMS:
+    direct_paise: 20
+    annoyance_paise: 900
+  WHATSAPP:
+    direct_paise: 45
+    annoyance_paise: 700
+  EMAIL:
+    direct_paise: 2
+    annoyance_paise: 250
+  VOICE:
+    direct_paise: 150
+    annoyance_paise: 2200
+  IN_APP:
+    direct_paise: 1
+    annoyance_paise: 300
+  HUMAN:
+    direct_paise: 6000
+    annoyance_paise: 500
+
+actions:
+  RETRY_CHARGE:
+    direct_paise: 0
+    risk_paise: 150
+  RETRY_CHARGE_ALT_ROUTE:
+    direct_paise: 0
+    risk_paise: 200
+  SPLIT_RETRY:
+    direct_paise: 0
+    risk_paise: 250
+  ESCALATE_HUMAN:
+    direct_paise: 6000
+    risk_paise: 0
+  RAISE_ENG_TICKET:
+    direct_paise: 2500
+    risk_paise: 0
+  WAIT:
+    direct_paise: 0
+    risk_paise: 0
+
+annoyance_growth_per_touch: 1.6

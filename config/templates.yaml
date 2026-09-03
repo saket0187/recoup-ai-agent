@@ -1,0 +1,92 @@
+templates_version: '2026.08.29-1'
+
+templates:
+  - id: NUDGE
+    actions: [SEND_NUDGE]
+    rung: GENTLE_REMINDER
+    includes_offer: false
+    bodies:
+      en: 'Your payment of {{amount}} to {{merchant}} did not go through. You can complete it here: {{link}}'
+      hi: '{{merchant}} ko aapka {{amount}} ka bhugtan pura nahin hua. Yahan pura karein: {{link}}'
+      hinglish: '{{merchant}} ka {{amount}} ka payment complete nahi hua. Yahan se kar sakte hain: {{link}}'
+
+  - id: PAYMENT_LINK
+    actions: [SEND_PAYMENT_LINK]
+    rung: GENTLE_REMINDER
+    includes_offer: false
+    bodies:
+      en: 'Here is a UPI link to complete your {{amount}} payment to {{merchant}}: {{link}}'
+      hi: '{{merchant}} ko {{amount}} ka bhugtan UPI se pura karne ke liye link: {{link}}'
+      hinglish: '{{merchant}} ka {{amount}} UPI se pay karne ke liye link: {{link}}'
+
+  - id: PRE_DEBIT_NOTICE
+    actions: [SEND_PRE_DEBIT_NOTICE]
+    rung: GENTLE_REMINDER
+    includes_offer: false
+    bodies:
+      en: 'We will attempt to debit {{amount}} for your {{merchant}} subscription on {{due_date}}.'
+      hi: '{{merchant}} subscription ke liye {{amount}} {{due_date}} ko debit kiya jayega.'
+      hinglish: '{{merchant}} subscription ka {{amount}} {{due_date}} ko debit karenge.'
+
+  - id: INSTRUMENT_UPDATE
+    actions: [REQUEST_INSTRUMENT_UPDATE, OFFER_METHOD_SWITCH]
+    rung: GENTLE_REMINDER
+    includes_offer: false
+    bodies:
+      en: 'Your saved payment method for {{merchant}} is no longer usable. You can add UPI AutoPay here: {{link}}'
+      hi: '{{merchant}} ke liye aapka saved payment method kaam nahin kar raha. UPI AutoPay yahan jodein: {{link}}'
+      hinglish: '{{merchant}} ke liye aapka payment method kaam nahi kar raha. UPI AutoPay yahan add karein: {{link}}'
+
+  - id: MANDATE_REPAIR
+    actions: [MANDATE_REPAIR]
+    rung: GENTLE_REMINDER
+    includes_offer: false
+    bodies:
+      en: 'The auto-pay mandate for {{merchant}} needs to be set up again. It takes a minute: {{link}}'
+      hi: '{{merchant}} ka auto-pay mandate dobara set karna hoga. Ek minute lagega: {{link}}'
+      hinglish: '{{merchant}} ka auto-pay mandate dobara set karna padega. Ek minute ka kaam hai: {{link}}'
+
+  - id: PART_PAYMENT
+    actions: [OFFER_PART_PAYMENT]
+    rung: OFFER
+    includes_offer: true
+    bodies:
+      en: 'If {{amount}} is difficult right now, you can pay part of it today and the rest later: {{link}}'
+      hi: 'Agar {{amount}} abhi mushkil hai, to aaj kuch hissa aur baaki baad mein de sakte hain: {{link}}'
+      hinglish: 'Agar {{amount}} abhi heavy lag raha hai, to thoda aaj aur baaki baad mein: {{link}}'
+
+  - id: PLAN
+    actions: [OFFER_PLAN]
+    rung: OFFER
+    includes_offer: true
+    bodies:
+      en: 'You can split {{amount}} into smaller instalments. Set it up here: {{link}}'
+      hi: '{{amount}} ko chhoti kishton mein baant sakte hain. Yahan set karein: {{link}}'
+      hinglish: '{{amount}} ko instalments mein divide kar sakte hain. Yahan set karein: {{link}}'
+
+  - id: DISCOUNT
+    actions: [OFFER_DISCOUNT]
+    rung: OFFER
+    includes_offer: true
+    bodies:
+      en: 'We can settle your {{merchant}} balance of {{amount}} at a reduced amount. Details here: {{link}}'
+      hi: '{{merchant}} ka {{amount}} ka balance kam rashi mein settle kar sakte hain. Vivaran: {{link}}'
+      hinglish: '{{merchant}} ka {{amount}} ka balance kam amount mein settle ho sakta hai. Details: {{link}}'
+
+  - id: EXTENSION
+    actions: [GRANT_EXTENSION]
+    rung: OFFER
+    includes_offer: true
+    bodies:
+      en: 'We have extended your {{merchant}} due date by {{days}} days. The amount due is {{amount}}.'
+      hi: '{{merchant}} ki due date {{days}} din badha di gayi hai. Rashi {{amount}} hai.'
+      hinglish: '{{merchant}} ki due date {{days}} din aage badha di hai. Amount {{amount}} hai.'
+
+  - id: ESCALATION
+    actions: [ESCALATE_CONTACT]
+    rung: FIRM_REMINDER
+    includes_offer: false
+    bodies:
+      en: 'Your {{merchant}} balance of {{amount}} is still open. Please complete it or tell us what you need: {{link}}'
+      hi: '{{merchant}} ka {{amount}} ab bhi bakaya hai. Kripya pura karein ya batayein aapko kya chahiye: {{link}}'
+      hinglish: '{{merchant}} ka {{amount}} abhi bhi pending hai. Please complete karein ya batayein kya help chahiye: {{link}}'

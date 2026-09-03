@@ -1,0 +1,1 @@
+ALTER TABLE `actions` ADD `best_remaining_ev_paise` integer DEFAULT 0 NOT NULL;

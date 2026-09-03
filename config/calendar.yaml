@@ -1,0 +1,10 @@
+timezone: Asia/Kolkata
+
+bank_holidays:
+  - '2026-09-08'
+  - '2026-10-04'
+
+festivals:
+  - name: Festival week
+    start: '2026-09-13'
+    end: '2026-09-17'

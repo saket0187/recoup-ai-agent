@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Secrets and personal data
+        run: npm run check:secrets
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Migrations are current
+        run: |
+          npm run db:generate
+          git diff --exit-code --stat drizzle \
+            || (echo "::error::drizzle/ is stale: run npm run db:generate and commit the result" && exit 1)
+
+      - name: Demo runs from a clean checkout
+        run: npm run demo -- --accounts 120 --traffic 40
+
+      - name: The audit chain the demo wrote verifies
+        run: npm run audit:verify
+
+      - name: Off-policy evaluation runs end to end
+        run: npm run eval:offpolicy -- --accounts 80 --traffic 30
+
+  ml:
+    name: ml (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.13']
+
+    defaults:
+      run:
+        working-directory: ml
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: ml/pyproject.toml
+
+      - run: pip install -e '.[dev,benchmark]'
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Format
+        run: ruff format --check .
+
+      - name: Types
+        run: pyright
+
+      - name: Tests
+        run: pytest -q
+
+      - name: The committed model still matches its golden vectors
+        run: python -m recoup_uplift.verify ../fixtures/uplift-model.json ../fixtures/uplift-golden.json
+
+  build:
+    name: next build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build

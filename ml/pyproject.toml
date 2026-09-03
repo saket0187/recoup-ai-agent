@@ -1,0 +1,43 @@
+[project]
+name = "recoup-uplift"
+version = "0.1.0"
+description = "Uplift model training for the Recoup AI Agent decision engine"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26,<3",
+    "scikit-learn>=1.4,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "pyright>=1.1.380"]
+benchmark = ["pandas>=2.0"]
+
+[project.scripts]
+recoup-train = "recoup_uplift.train:main"
+recoup-benchmark = "recoup_uplift.benchmark:main"
+recoup-verify = "recoup_uplift.verify:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["recoup_uplift*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pyright]
+include = ["recoup_uplift", "tests"]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
