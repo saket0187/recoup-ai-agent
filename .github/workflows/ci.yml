@@ -50,10 +50,12 @@ jobs:
             || (echo "::error::drizzle/ is stale: run npm run db:generate and commit the result" && exit 1)
 
       - name: Demo runs from a clean checkout
-        run: npm run demo -- --accounts 120 --traffic 40
+        run: npm run demo -- --accounts 900 --traffic 200 --db ./data/ci.db
 
       - name: The audit chain the demo wrote verifies
         run: npm run audit:verify
+        env:
+          DB_PATH: ./data/ci.db
 
       - name: Off-policy evaluation runs end to end
         run: npm run eval:offpolicy -- --accounts 80 --traffic 30

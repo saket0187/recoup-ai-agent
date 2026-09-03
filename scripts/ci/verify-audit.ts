@@ -1,3 +1,5 @@
+import { migrate } from 'drizzle-orm/libsql/migrator'
+
 import { getConfig } from '../../src/core/config'
 import { RealClock } from '../../src/core/clock'
 import { createIdFactory } from '../../src/core/identifiers'
@@ -8,6 +10,8 @@ const config = getConfig()
 const handle = await createDatabase(config.dbPath)
 
 try {
+  await migrate(handle.db, { migrationsFolder: './drizzle' })
+
   const chain = new AuditChain(handle.db, new RealClock(), createIdFactory('verify'))
   const merchantIds = await chain.listMerchants()
 

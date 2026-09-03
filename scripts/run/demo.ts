@@ -14,6 +14,7 @@ const { values } = parseArgs({
     seed: { type: 'string' },
     accounts: { type: 'string' },
     traffic: { type: 'string' },
+    db: { type: 'string' },
   },
 })
 
@@ -32,7 +33,13 @@ for (const [name, value] of [
   }
 }
 
-const scenario = await runScenario({ seed, accounts, trafficPerHour: traffic, label: 'demo' })
+const scenario = await runScenario({
+  seed,
+  accounts,
+  trafficPerHour: traffic,
+  label: 'demo',
+  ...(values.db === undefined ? {} : { dbPath: values.db }),
+})
 const result = await measure(
   scenario.handle.db,
   MERCHANT_ID,
