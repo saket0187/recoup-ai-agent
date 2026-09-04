@@ -6,7 +6,8 @@
   "type": "module",
   "description": "Recoup AI Agent \u2014 bounded revenue recovery for subscription and invoice businesses. Recovers what's recoverable. Stops when it isn't.",
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=22.6.0",
+    "npm": ">=11"
   },
   "scripts": {
     "dev": "next dev",
