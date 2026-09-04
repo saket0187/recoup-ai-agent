@@ -6,7 +6,8 @@
   "type": "module",
   "description": "Recoup AI Agent \u2014 bounded revenue recovery for subscription and invoice businesses. Recovers what's recoverable. Stops when it isn't.",
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=22.6.0",
+    "npm": ">=11"
   },
   "scripts": {
     "dev": "next dev",
@@ -51,21 +52,21 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@eslint/js": "^9.31.0",
-    "@types/node": "^24.0.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.4.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "drizzle-kit": "^0.31.0",
-    "eslint": "^9.31.0",
+    "eslint": "^10.9.1",
     "fast-check": "^4.9.0",
-    "globals": "^16.3.0",
+    "globals": "^17.11.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.4.1",
     "prettier": "^3.9.6",
-    "tsx": "^4.20.0",
-    "typescript": "^5.8.0",
-    "typescript-eslint": "^8.37.0",
-    "vitest": "^3.2.0"
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^4.1.11"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,json,md,yaml,yml}": [
