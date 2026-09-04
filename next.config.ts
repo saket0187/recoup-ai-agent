@@ -6,7 +6,6 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ['@libsql/client'],
   typescript: { ignoreBuildErrors: false },
-  eslint: { ignoreDuringBuilds: true },
 }
 
 export default nextConfig
