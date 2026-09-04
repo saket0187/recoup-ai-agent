@@ -43,7 +43,7 @@
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
-    "drizzle-orm": "^0.44.2",
+    "drizzle-orm": "^0.45.2",
     "next": "^15.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
