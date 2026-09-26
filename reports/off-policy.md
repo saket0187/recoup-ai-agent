@@ -1,21 +1,21 @@
 # Off-policy evaluation
 
-Seed `43`, 300 accounts, 6,575 logged decisions.
+Seed `43`, 600 accounts, 14,911 logged decisions.
 
 Every decision the agent ever took recorded the probability with which it took it. That is what
 makes it possible to score a policy the agent never ran, without running the simulator again.
 
-Observed recovery within the attribution window: **4.15%** of decisions, under a
+Observed recovery within the attribution window: **3.14%** of decisions, under a
 logging policy that explores. The first row below deterministically repeats whatever was logged,
 so it drops the exploration and should score a little higher than the observed rate. It does.
 
 | Target policy | IPS | SNIPS | Doubly robust | 95% interval (SNIPS) | Overlap | ESS |
 |---|---:|---:|---:|---|---:|---:|
-| Replay the logged action every time | 7.73% | 4.96% | 3.55% | [3.58%, 6.51%] | 100.00% | 3279 |
-| Never act | 2.65% | 2.82% | 3.02% | [1.75%, 4.22%] | 74.02% | 3122 |
-| The incumbent fixed schedule | 2.21% | 5.57% | 7.55% | [3.68%, 8.04%] | 28.67% | 1397 |
-| Always retry, never message | 2.27% | 9.26% | 11.28% | [6.62%, 12.95%] | 16.20% | 916 |
-| Always WhatsApp a nudge | 0.14% | 8.79% | 2.24% | [0.00%, 18.81%] | 0.44% | 26 |
+| Replay the logged action every time | 4.46% | 3.28% | 1.28% | [2.53%, 4.08%] | 100.00% | 8579 |
+| Never act | 1.72% | 1.78% | 1.07% | [1.36%, 2.27%] | 80.05% | 7692 |
+| The incumbent fixed schedule | 1.69% | 5.45% | 11.24% | [3.97%, 7.32%] | 21.81% | 2431 |
+| Always retry, never message | 1.27% | 6.30% | 13.04% | [4.72%, 8.51%] | 12.26% | 1532 |
+| Always WhatsApp a nudge | 0.00% | 0.00% | 0.00% | [0.00%, 0.00%] | 0.09% | 10 |
 
 **How to read this.** IPS is unbiased but high variance. SNIPS divides by the realised
 weight rather than the sample size, which trades a little bias for much less variance and

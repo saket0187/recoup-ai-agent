@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 import { formatINRCompact, paise } from '../../core/money'
 import { consoleState } from '../lib/console-data'
-import { caseList } from '../lib/queries/cases'
+import { caseTotals } from '../lib/queries/cases'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +10,7 @@ const LOOP = [
   { name: 'Detect', note: 'A gateway webhook opens a case and records what is owed.' },
   { name: 'Diagnose', note: 'The bank error maps to one of 8 recovery classes.' },
   { name: 'Decide', note: 'A playbook prices each option against doing nothing.' },
-  { name: 'Gate', note: '35 compliance rules, then 18 stop conditions.' },
+  { name: 'Gate', note: '36 compliance rules, then 18 stop conditions.' },
   { name: 'Execute', note: 'Idempotent outbox; the stop gate runs again first.' },
   { name: 'Measure', note: 'Against a randomised control arm, with intervals.' },
 ] as const
@@ -19,9 +19,9 @@ export default async function Landing(): Promise<React.ReactElement> {
   const state = await consoleState().catch(() => undefined)
   const seeded = state?.seeded === true
 
-  const cases = seeded ? await caseList(4000).catch(() => []) : []
-  const recovered = cases.reduce((sum, row) => sum + row.recoveredPaise, 0)
-  const distinctTypes = new Set(cases.map((row) => row.type)).size
+  const totals = seeded ? await caseTotals().catch(() => undefined) : undefined
+  const recovered = totals?.recoveredPaise ?? 0
+  const distinctTypes = totals?.caseTypes ?? 0
 
   return (
     <>
@@ -147,10 +147,12 @@ export default async function Landing(): Promise<React.ReactElement> {
               the difference can be measured rather than asserted.
             </p>
             <p>
-              On the current batch the agent measures at <strong>parity</strong> with that schedule:
-              the confidence interval contains zero, so we cannot yet claim it wins. Compliance is
-              not in question: policy violations are zero, every decision carries a logged
-              propensity, and the audit chain is verifiable with{' '}
+              Across seven batches the model never saw, the agent recovers more than that schedule
+              on <strong>five</strong>, by 1.6 points of what is owed on average, and on six it
+              comes out ahead even after paying for every action it took. One batch is small, so the
+              claim rests on the average rather than on any single run. Compliance is not in
+              question: policy violations are zero, every decision carries a logged propensity, and
+              the audit chain is verifiable with{' '}
               <span className="inline-code">npm run audit:verify</span>, which CI runs on every
               push. Every defect found along the way, including the ones that made earlier and
               better-looking numbers wrong, is written up in{' '}

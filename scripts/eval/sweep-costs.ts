@@ -108,4 +108,4 @@ for (const { scale, result } of points) {
       `${excludesZero(fraction) ? '  *' : ''}`,
   )
 }
-console.log('')
+process.stdout.write('\n', () => process.exit(0))

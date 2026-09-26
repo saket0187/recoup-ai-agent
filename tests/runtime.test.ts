@@ -9,7 +9,7 @@ import { createRng } from '../src/core/seeded-random'
 import { ThompsonBandit } from '../src/decision/bandit'
 import { BanditStore } from '../src/decision/bandit-store'
 import type { DatabaseHandle } from '../src/db/client'
-import { customers, decisions, riskCases } from '../src/db/schema'
+import { auditRecords, customers, decisions, riskCases } from '../src/db/schema'
 import { observationSenders, ObservationPaymentExecutor } from '../src/providers/observation'
 import { signPayload } from '../src/providers/gateway/adapter'
 import type { GatewayEvent } from '../src/providers/gateway/webhook-schema'
@@ -105,6 +105,28 @@ describe('composeAgent: the runtime the webhook and the harness share', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]?.type).toBe('FAILED_PAYMENT')
     expect(rows[0]?.amountPaise).toBe(250_000)
+  })
+
+  it('records a named approval once, audits it, and lets the rules see it', async () => {
+    await deliver(agent, failureEvent('pay_rt_big', 6_000_000, AT), 'evt_big')
+    const [row] = await handle.db.select().from(riskCases).where(eq(riskCases.merchantId, MERCHANT))
+    if (row === undefined) throw new Error('no case projected')
+
+    expect(await agent.approve('case_missing', 'ops.lead')).toBe('NOT_FOUND')
+    expect(await agent.approve(row.id, 'ops.lead')).toBe('APPROVED')
+    expect(await agent.approve(row.id, 'ops.second')).toBe('ALREADY_APPROVED')
+
+    const view = await agent.contexts.load(row.id)
+    if (view === undefined) throw new Error('case vanished')
+    expect(
+      agent.contexts.policyContext(view, 'RETRY_CHARGE', undefined, undefined).humanApproved,
+    ).toBe(true)
+
+    const reviews = await handle.db
+      .select()
+      .from(auditRecords)
+      .where(eq(auditRecords.entryType, 'HUMAN_REVIEW'))
+    expect(reviews.map((record) => record.actor)).toEqual(['ops.lead'])
   })
 
   it('rejects a body whose signature does not match', async () => {

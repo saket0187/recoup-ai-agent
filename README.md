@@ -39,7 +39,7 @@ npm run seed:console  # about a minute
 npm run dev           # http://localhost:3000
 ```
 
-`npm run check` runs the secret scan, formatter, type checker, linter and the 622 tests.
+`npm run check` runs the secret scan, formatter, type checker, linter and the 650 tests.
 
 Retraining the model additionally needs Python 3.11+, and nothing else does. The trained
 model is committed as JSON, so the demo, the tests and the measurement all run without it.
@@ -64,7 +64,7 @@ Four things separate it from a script that sends reminders on a timer:
 **It decides rather than follows.** Every cycle it prices each available action against
 doing nothing, and doing nothing frequently wins.
 
-**It is bounded, and the bounds are outside the model.** A policy gate of 35 rules and a
+**It is bounded, and the bounds are outside the model.** A policy gate of 36 rules and a
 stop gate of 18 conditions run as ordinary code, before and again at execution. A rule that
 throws is counted as a refusal. No prediction can talk its way past them.
 
@@ -75,7 +75,7 @@ next to their effective sample size.
 
 **It knows what it does not know.** The uplift model is scored per action during
 cross-validation, and it may only rank an action whose Qini clears its own standard error.
-On the current model that is 5 actions of 9. The other four are handed back to the
+On the current model that is 5 actions of 11. The other six are handed back to the
 playbook rather than guessed at.
 
 What it is not: there is no language model anywhere in the system. Message copy comes from
@@ -88,11 +88,11 @@ not in generation. Everything it does replays byte-identically from a seed.
 
 | Step         | What runs                                                              |
 | ------------ | ---------------------------------------------------------------------- |
-| **Detect**   | A signed webhook opens a case; what is owed is derived from the ledger |
+| **Detect**   | Only a signed failure opens a case; what is owed comes from the ledger |
 | **Diagnose** | The bank's error code maps to one of 8 recovery classes                |
 | **Decide**   | A playbook prices each option against doing nothing                    |
-| **Gate**     | 35 compliance rules, then 18 stop conditions, both fail closed         |
-| **Execute**  | Idempotent outbox; the stop gate runs again immediately before sending |
+| **Gate**     | 36 compliance rules, then 18 stop conditions, both fail closed         |
+| **Execute**  | Idempotent outbox; both gates run again immediately before sending     |
 | **Measure**  | Against a randomised control arm, post-stratified, with intervals      |
 
 Cohort health runs alongside it. When a `method × issuer` route starts failing, retries
@@ -103,39 +103,52 @@ bank's.
 
 ## What the measurement says
 
-Out of sample, on a seed the model never saw:
+Out of sample, on seven seeds the model never saw, each with its own randomised control arm
+running the fixed schedule:
 
-| Claim                     | Result                                                   |
-| ------------------------- | -------------------------------------------------------- |
-| Incremental recovery      | +1.62pp, 95% interval [-3.09, 5.88], **not significant** |
-| Policy violations         | 0                                                        |
-| Decisions with propensity | 100%                                                     |
-| Audit chain               | verifies intact, checked in CI                           |
+| Claim                                    | Result                                                 |
+| ---------------------------------------- | ------------------------------------------------------ |
+| Seeds where the agent recovers more      | 5 of 7                                                 |
+| Extra share of the owed amount recovered | +1.62 points on average                                |
+| Net value per case, after action costs   | +₹300 on average, positive on 6 of 7 seeds             |
+| Cases recovered                          | 16.3% against 14.5% for the fixed schedule             |
+| Policy violations                        | 0, counting any message sent against a deny or a defer |
+| Decisions with propensity                | 100%                                                   |
+| Audit chain                              | verifies intact, checked in CI                         |
 
-The headline is post-stratified by the amount-band by failure-class strata the arms were
-assigned on. That is the same estimand as a plain difference of means, with about 28% less
-variance, and on the current batch it moves the estimate down rather than up. The extra
-precision is not cosmetic: removing the incumbent floor now measures **-5.08pp
-[-9.52, -1.06]** against control, which the unstratified estimator could not separate from
-zero.
+The baseline is not a straw man: three retries, one SMS and one email is roughly what a
+competent merchant already does. Net value subtracts the cost of every action the agent
+sent, so the gain is what is left after paying for the extra contact.
 
-**The revenue claim is parity, not a win.** The baseline is not a straw man: three retries,
-one SMS and one email is roughly what a competent merchant already does. The agent contacts
-about a third as often and lands in the same place. That is a real result, and it is not
-the result anyone hopes for.
+A single seed has about 130 control cases, so one seed can swing several points either
+way, and the average across seven is the steadier read. Each seed's figure is
+post-stratified by the amount-band by failure-class strata the arms were assigned on. That
+is the same estimand as a plain difference of means with less variance, and on seed 43 it
+moves the estimate down rather than up. `reports/measurement.md` lists every seed, with the
+full breakdown and intervals for seed 43.
 
-Ablation is more informative than the headline, because comparing configurations on the
-same world removes the between-world variance:
+Ablation shows where the gain comes from. Comparing configurations on the same world
+removes the between-world variance:
 
-| Layer removed                                                      | Change in recovered fraction | Earns its place    |
-| ------------------------------------------------------------------ | ---------------------------: | ------------------ |
-| The policy gate                                                    |                      -9.69pp | no, it costs money |
-| The incumbent floor                                                |                      +6.27pp | **yes**            |
-| Timing, diagnosis, uplift, reviewer, allocation, action-skill gate |                 within noise | not detectable     |
+| Layer removed         | What the layer adds | 95% interval  |
+| --------------------- | ------------------: | ------------- |
+| The policy gate       |         **+6.95pp** | [2.57, 10.94] |
+| The incumbent floor   |             +3.78pp | [-0.40, 7.97] |
+| Diagnosis             |             +1.39pp | [-3.00, 5.58] |
+| The action-skill gate |             +1.39pp | [-3.18, 5.78] |
+| Timing                |             +0.60pp | [-3.59, 5.18] |
+| Uplift                |             +0.60pp | [-3.58, 4.98] |
+| The reviewer          |             +0.00pp | [-4.97, 4.58] |
+| Allocation            |             +0.00pp | [-4.38, 4.38] |
 
-Only one layer is significant across every run, and it is the floor that stops the agent
-regressing below the fixed schedule. The rest are reported as undetectable rather than
-quietly dropped, because that is what the intervals say.
+Every layer's estimate is zero or positive, and the largest is compliance itself. With the
+policy gate's 36 rules removed, the same engine recovers 8.4% of its cases instead of
+15.3%. Contact fatigue and opt-outs are part of the simulated world, so badly timed or
+unwanted contact costs goodwill, and compliance pays for itself. That is a consequence of
+the simulator's assumptions rather than an observation of real customers. The incumbent
+floor, which stops the agent doing less than the fixed schedule, adds almost four points.
+The reviewer and the allocation budget never bind in the simulated world, so they change
+nothing here.
 
 Every number above is regenerated by `npm run measure`, and the simulation constants behind
 them are written down in `docs/simulation-assumptions.md` rather than buried in code.
@@ -148,10 +161,12 @@ Training runs in Python (`ml/`, scikit-learn). Serving runs in TypeScript. The b
 a committed JSON file, so a clone with no Python still runs everything.
 
 Six candidates are compared under grouped cross-validation that holds whole cases out:
-S-learner and T-learner, each over logistic regression and gradient boosting at depth 2 and 3. Selection uses the one-standard-error rule, taking the simplest candidate within one
+S-learner and T-learner, each over logistic regression and gradient boosting at depth 2
+and 3. Selection uses the one-standard-error rule, taking the simplest candidate within one
 standard error of the best, because cross-validated Qini is itself an estimate and chasing
 its maximum selects for a lucky fold split. The current winner is an S-learner over
-gradient boosting at depth 2, at **Qini 0.171 ± 0.011**.
+gradient boosting at depth 3, at **Qini 0.188 ± 0.006**, trained on 103,482 logged
+decisions.
 
 Three things keep the language split honest:
 
@@ -164,15 +179,17 @@ Three things keep the language split honest:
   TypeScript suite and by CI.
 
 Per-action skill is the part worth arguing about. Cross-validated Qini ranges from
-**+0.230** on `RETRY_CHARGE` down to **-0.443** on `MANDATE_REPAIR`, which is much worse
-than random. The trainer exports that spread, and an action is trusted only when its Qini
-clears its own standard error, which is the same one-standard-error discipline used to pick
-the model. `SEND_NUDGE|SMS` at +0.041 ± 0.070 fails that test and is excluded, even though
-its point estimate is positive.
+**+0.35** on the pre-debit notices and **+0.23** on `RETRY_CHARGE` down to **-0.30** on
+`SEND_PAYMENT_LINK|WHATSAPP`, which is much worse than random. The trainer exports that
+spread, and an action is trusted only when its Qini clears its own standard error, which is
+the same one-standard-error discipline used to pick the model. `OFFER_METHOD_SWITCH|WHATSAPP`
+at +0.002 ± 0.062 fails that test and is excluded, even though its point estimate is
+positive.
 
 The uplift machinery is separately validated on the Hillstrom email trial, a real
-randomised experiment over 42,694 customers (`npm run ml:benchmark`). That tests the
-statistics, not the payments domain, and the two claims are kept apart deliberately.
+randomised experiment: 42,613 customers, the men's e-mail against no e-mail
+(`npm run ml:benchmark`). That tests the statistics, not the payments domain, and the two
+claims are kept apart deliberately.
 
 ---
 
@@ -188,8 +205,13 @@ nothing and the incumbent schedule, under IPS, SNIPS and a doubly-robust estimat
 
 It reports overlap and effective sample size beside every estimate, which is the part that
 matters: a policy far from the logged one scores whatever it likes on a handful of rows.
-"Always WhatsApp a nudge" currently looks best in the table and has an effective sample
-size of about 20, so it is not a finding, it is an artefact, and the report says so.
+"Always WhatsApp a nudge" rests on an effective sample size of 10, so its row says nothing.
+On the current log, SNIPS scores the fixed schedule and "always retry, never message" above
+the agent's own logged policy, on effective sample sizes in the thousands, while plain IPS
+ranks them below it. With overlap between 12% and 22% the estimators disagree, and the
+randomised comparison above, which does not rely on overlap, has the agent ahead of that
+same schedule on five seeds of seven. So the report ranks candidates worth piloting rather
+than measuring them.
 
 ---
 
@@ -213,10 +235,10 @@ src/
   measurement/ bootstrap intervals, ablations, off-policy estimators
   sim/         the synthetic world: accounts, latent state, outages
   db/          schema, migrations, hash-chained audit
-  app/         landing pages, five-screen console, three API routes
+  app/         landing pages, five-screen console, four API routes
 ml/            Python trainer, evaluation, verified export
 config/        policy, authority, costs, templates and calendar as YAML
-tests/         622 tests across 35 files
+tests/         650 tests across 36 files
 ```
 
 `src/runtime/compose.ts` is the only place the agent is assembled. The webhook route and
@@ -242,14 +264,22 @@ chained, each record over the previous hash plus its own canonical JSON.
 ## Integration
 
 One webhook endpoint. Signatures are checked against the raw body with a constant-time
-comparison before anything is parsed, and every outcome is a distinct status code so a
-misconfigured integration is never mistaken for an accepted one.
+comparison before anything is parsed, and every outcome is distinct in the response, so a
+misconfigured integration is never mistaken for an accepted one. A correctly signed event
+that cannot be read is stored as a dead letter and still acknowledged, so a gateway never
+retries it until the webhook is disabled. The header names are settings
+(`WEBHOOK_SIGNATURE_HEADER`, `WEBHOOK_EVENT_ID_HEADER`), so the endpoint reads whatever its
+gateway sends.
 
 ```
-POST /api/v1/events     202 accepted · 401 bad signature · 413 too large
-                        422 schema mismatch · 503 secret not configured
-GET  /api/v1/metrics    the same figures the console shows, as JSON
+POST /api/v1/events              202 accepted or dead-lettered · 401 bad signature
+                                 413 too large · 503 secret not configured
+POST /api/v1/cases/:id/approve   a named person signs off a case above the ceiling
+GET  /api/v1/metrics             the same figures the console shows, as JSON
 ```
+
+Anything above ₹50,000 waits for that sign-off before the agent acts on it, and every
+approval is written to the audit chain with the approver's name.
 
 `DRY_RUN` defaults to true: every decision is made, gated and recorded, and nothing leaves
 the process. Turning it off needs two independent signals, so the whole system can run

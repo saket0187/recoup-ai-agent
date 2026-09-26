@@ -116,7 +116,11 @@ describe('engine integration', () => {
   beforeEach(async () => {
     handle = await createTestDatabase()
     await seedMerchant(handle)
-    await seedCase(handle, { at: AT - 3 * 86_400_000, amountPaise: 2_000_000 })
+    await seedCase(handle, {
+      at: AT - 3 * 86_400_000,
+      amountPaise: 2_000_000,
+      mandateCapPaise: 5_000_000,
+    })
 
     clock = new VirtualClock({ start: AT })
     const ids = createIdFactory('engine-test')
@@ -285,6 +289,13 @@ describe('engine integration', () => {
         void at
         return contexts.stopContext(view, action.type, paise(9_000))
       },
+      policyFor: async (action) => {
+        const view = await contexts.load(action.caseId)
+        if (view === undefined) throw new Error('case vanished')
+        return new PolicyEngine(policy, authority, facts.bankHolidays).evaluate(
+          contexts.policyContext(view, action.type, action.channel ?? undefined, undefined),
+        )
+      },
       payloadFor: async (action) => {
         const view = await contexts.load(action.caseId)
         if (view === undefined) return undefined
@@ -337,6 +348,13 @@ describe('engine integration', () => {
         const view = await contexts.load(action.caseId)
         if (view === undefined) throw new Error('case vanished')
         return contexts.stopContext(view, action.type, paise(9_000))
+      },
+      policyFor: async (action) => {
+        const view = await contexts.load(action.caseId)
+        if (view === undefined) throw new Error('case vanished')
+        return new PolicyEngine(policy, authority, facts.bankHolidays).evaluate(
+          contexts.policyContext(view, action.type, action.channel ?? undefined, undefined),
+        )
       },
       payloadFor: async () => undefined,
     })

@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 
 import { formatINR, paise, type Paise } from '../../../core/money'
 import {
@@ -30,11 +30,67 @@ export interface CaseRow {
 
 export async function caseCount(): Promise<number> {
   const db = await consoleDb()
-  const rows = await db
-    .select({ id: riskCases.id })
+  const [row] = await db
+    .select({ count: sql<number>`count(*)` })
     .from(riskCases)
     .where(eq(riskCases.merchantId, MERCHANT_ID))
-  return rows.length
+  return row?.count ?? 0
+}
+
+export interface CaseTotals {
+  readonly cases: number
+  readonly diagnosed: number
+  readonly contacted: number
+  readonly recoveredCases: number
+  readonly caseTypes: number
+  readonly billedPaise: Paise
+  readonly recoveredPaise: Paise
+  readonly atRiskPaise: Paise
+  readonly recoveredRupeesByDay: readonly number[]
+}
+
+export async function caseTotals(): Promise<CaseTotals> {
+  const db = await consoleDb()
+  const mine = eq(riskCases.merchantId, MERCHANT_ID)
+
+  const [totals] = await db
+    .select({
+      cases: sql<number>`count(*)`,
+      contacted: sql<number>`coalesce(sum(case when ${riskCases.touchCount} > 0 then 1 else 0 end), 0)`,
+      recoveredCases: sql<number>`coalesce(sum(case when ${riskCases.state} = 'RECOVERED' then 1 else 0 end), 0)`,
+      caseTypes: sql<number>`count(distinct ${riskCases.type})`,
+      billed: sql<number>`coalesce(sum(${riskCases.amountPaise}), 0)`,
+      recovered: sql<number>`coalesce(sum(${riskCases.recoveredPaise}), 0)`,
+      atRisk: sql<number>`coalesce(sum(case when ${riskCases.state} not in ('RECOVERED', 'WRITTEN_OFF') then ${riskCases.amountPaise} - ${riskCases.recoveredPaise} else 0 end), 0)`,
+    })
+    .from(riskCases)
+    .where(mine)
+
+  const [diagnosed] = await db
+    .select({ count: sql<number>`count(distinct ${diagnoses.caseId})` })
+    .from(diagnoses)
+    .innerJoin(riskCases, eq(diagnoses.caseId, riskCases.id))
+    .where(mine)
+
+  const day = sql<number>`${riskCases.resolvedAt} / 86400000`
+  const daily = await db
+    .select({ day, recovered: sql<number>`sum(${riskCases.recoveredPaise})` })
+    .from(riskCases)
+    .where(and(mine, isNotNull(riskCases.resolvedAt)))
+    .groupBy(day)
+    .orderBy(day)
+
+  return {
+    cases: totals?.cases ?? 0,
+    diagnosed: diagnosed?.count ?? 0,
+    contacted: totals?.contacted ?? 0,
+    recoveredCases: totals?.recoveredCases ?? 0,
+    caseTypes: totals?.caseTypes ?? 0,
+    billedPaise: paise(totals?.billed ?? 0),
+    recoveredPaise: paise(totals?.recovered ?? 0),
+    atRiskPaise: paise(totals?.atRisk ?? 0),
+    recoveredRupeesByDay: daily.map((row) => row.recovered / 100),
+  }
 }
 
 export async function caseList(limit = 300): Promise<CaseRow[]> {
@@ -100,6 +156,7 @@ export interface CaseDetail {
   readonly outstandingPaise: Paise
   readonly timeline: readonly TimelineEntry[]
   readonly decisionCount: number
+  readonly approval: { readonly at: number; readonly by: string } | undefined
 }
 
 function toneOfVerdict(verdict: string): TimelineEntry['tone'] {
@@ -215,5 +272,9 @@ export async function caseDetail(caseId: string): Promise<CaseDetail | undefined
     outstandingPaise: paise(Math.max(0, outstanding)),
     timeline,
     decisionCount: decisionRows.length,
+    approval:
+      row.humanApprovedAt === null
+        ? undefined
+        : { at: row.humanApprovedAt, by: row.humanApprovedBy ?? 'unknown' },
   }
 }

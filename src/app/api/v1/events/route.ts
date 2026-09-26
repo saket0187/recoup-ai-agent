@@ -4,21 +4,30 @@ import { NextResponse } from 'next/server'
 
 import { getConfig } from '../../../../core/config'
 import { signPayload } from '../../../../providers/gateway/adapter'
-import { gatewayEventSchema } from '../../../../providers/gateway/webhook-schema'
 import { webhookEventId } from '../../../../signal/receiver'
 import { runtimeAgent } from '../../../../runtime/instance'
 import { consoleDb } from '../../../lib/queries/connection'
 
 export const dynamic = 'force-dynamic'
 
-const SIGNATURE_HEADER = 'x-recoup-signature'
 const MAX_BODY_BYTES = 256 * 1024
-const EVENT_ID_HEADER = 'x-recoup-event-id'
 
 function timingSafeMatch(provided: string, expected: string): boolean {
   const a = Buffer.from(provided, 'utf8')
   const b = Buffer.from(expected, 'utf8')
   return a.length === b.length && timingSafeEqual(a, b)
+}
+
+function eventTypeOf(raw: string): string {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed === 'object' && parsed !== null && 'event' in parsed) {
+      return typeof parsed.event === 'string' ? parsed.event : 'unknown'
+    }
+    return 'unknown'
+  } catch {
+    return 'unparseable'
+  }
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -46,7 +55,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     )
   }
 
-  const signature = request.headers.get(SIGNATURE_HEADER)
+  const config = getConfig()
+  const signature = request.headers.get(config.webhookSignatureHeader)
 
   if (signature === null || !timingSafeMatch(signature, signPayload(raw, secret))) {
     return NextResponse.json(
@@ -55,34 +65,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     )
   }
 
-  let parsedBody: unknown
-  try {
-    parsedBody = JSON.parse(raw)
-  } catch {
-    return NextResponse.json({ accepted: false, error: 'body is not JSON' }, { status: 400 })
-  }
-
-  const event = gatewayEventSchema.safeParse(parsedBody)
-  if (!event.success) {
-    return NextResponse.json(
-      {
-        accepted: false,
-        error: 'event does not match the expected schema',
-        issues: event.error.issues.map((issue) => ({
-          path: issue.path.join('.'),
-          message: issue.message,
-        })),
-      },
-      { status: 422 },
-    )
-  }
-
+  const eventType = eventTypeOf(raw)
   const agent = await runtimeAgent(await consoleDb(), secret)
 
   let outcome
   try {
     outcome = await agent.ingest({
-      eventId: webhookEventId(raw, request.headers.get(EVENT_ID_HEADER)),
+      eventId: webhookEventId(raw, request.headers.get(config.webhookEventIdHeader)),
       rawBody: raw,
       signature,
     })
@@ -99,25 +88,25 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (outcome.status === 'DUPLICATE') {
     return NextResponse.json(
-      { accepted: true, eventType: event.data.event, status: 'DUPLICATE', casesProjected: 0 },
+      { accepted: true, eventType, status: 'DUPLICATE', casesProjected: 0 },
       { status: 202 },
     )
   }
 
   if (outcome.status !== 'ACCEPTED') {
     return NextResponse.json(
-      { accepted: false, status: outcome.status, error: outcome.reason },
-      { status: outcome.status === 'REJECTED' ? 422 : 202 },
+      { accepted: false, eventType, status: outcome.status, error: outcome.reason },
+      { status: outcome.status === 'REJECTED' ? 401 : 202 },
     )
   }
 
   return NextResponse.json(
     {
       accepted: true,
-      eventType: event.data.event,
+      eventType,
       status: 'ACCEPTED',
       casesProjected: outcome.signals.length,
-      dryRun: getConfig().dryRun,
+      dryRun: config.dryRun,
     },
     { status: 202 },
   )

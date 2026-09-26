@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { istDateKey, istHour } from '../../../../core/calendar'
+import { loadAuthority } from '../../../../core/config-files'
 import { formatINR, paise } from '../../../../core/money'
 import { Disclosure } from '../../../components/disclosure'
 import { Term } from '../../../components/term'
@@ -176,6 +177,7 @@ export default async function CaseDetailPage({
   const { id } = await params
   const detail = await caseDetail(id)
   if (detail === undefined) notFound()
+  const approvalCeiling = loadAuthority().thresholds.human_approval_required_above_paise
 
   return (
     <>
@@ -228,6 +230,27 @@ export default async function CaseDetailPage({
           </div>
         </div>
       </div>
+
+      {detail.row.amountPaise > approvalCeiling ? (
+        <div className="panel" style={{ marginBottom: 12 }}>
+          <div className="panel-body">
+            {detail.approval === undefined ? (
+              <p className="plain" style={{ margin: 0 }}>
+                <strong>Waiting for approval from a person.</strong> Anything above{' '}
+                {formatINR(paise(approvalCeiling))} needs a named person to sign off before the
+                agent acts. Approve with{' '}
+                <span className="inline-code">POST /api/v1/cases/{detail.row.id}/approve</span> and
+                the API key.
+              </p>
+            ) : (
+              <p className="plain" style={{ margin: 0 }}>
+                <strong>Approved by {detail.approval.by}</strong> on{' '}
+                {istDateKey(detail.approval.at)}. The agent can now act on this case.
+              </p>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <div className="panel">
         <div className="panel-head">

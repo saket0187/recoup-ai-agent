@@ -32,7 +32,7 @@ const FLOW = [
     step: '4',
     title: 'Two gates check it',
     plain:
-      'The policy gate applies 35 compliance rules covering quiet hours, consent, do-not-disturb and contact limits. The stop gate asks whether we should be chasing at all.',
+      'The policy gate applies 36 compliance rules covering quiet hours, consent, do-not-disturb and contact limits. The stop gate asks whether we should be chasing at all.',
     detail:
       'Both are ordinary code, not a model, so nothing can talk them round. A rule that throws an error counts as a refusal. The stop gate runs twice, once when deciding and again just before sending, because a customer can pay in between.',
   },

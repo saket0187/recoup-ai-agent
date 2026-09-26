@@ -11,6 +11,8 @@ describe('loadConfig', () => {
     expect(config.clockMode).toBe('VIRTUAL')
     expect(config.dbPath).toBe('./data/recoup.db')
     expect(config.logLevel).toBe('info')
+    expect(config.webhookSignatureHeader).toBe('x-recoup-signature')
+    expect(config.webhookEventIdHeader).toBe('x-recoup-event-id')
   })
 
   it('treats an empty string as unset', () => {
@@ -41,7 +43,14 @@ describe('loadConfig', () => {
     expect(config.dryRun).toBe(false)
   })
 
-  it('refuses a real model client with no key', () => {})
+  it('lets a deployment name the webhook headers its gateway sends', () => {
+    const config = loadConfig({
+      WEBHOOK_SIGNATURE_HEADER: 'x-provider-signature',
+      WEBHOOK_EVENT_ID_HEADER: 'x-provider-event-id',
+    })
+    expect(config.webhookSignatureHeader).toBe('x-provider-signature')
+    expect(config.webhookEventIdHeader).toBe('x-provider-event-id')
+  })
 
   it('rejects a non-integer or out-of-range seed', () => {
     expect(() => loadConfig({ SEED: '4.2' })).toThrow(ConfigError)

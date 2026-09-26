@@ -11,6 +11,7 @@ import type { DatabaseHandle } from '../src/db/client'
 import { actions, contactEvents, riskCases } from '../src/db/schema'
 import { DryRunViolationError, Executor } from '../src/execution/executor'
 import { Outbox } from '../src/execution/outbox'
+import type { PolicyDecision } from '../src/policy/engine'
 import type { StopContext } from '../src/policy/stop-gate'
 import type {
   ChargeRequest,
@@ -186,6 +187,7 @@ describe('Executor', () => {
     dryRun?: boolean
     halted?: boolean
     stop?: Partial<StopContext>
+    policy?: Partial<PolicyDecision>
     maxAttempts?: number
   }): Executor {
     const sender = options.sender ?? new RecordingSender()
@@ -202,6 +204,15 @@ describe('Executor', () => {
       dryRun: options.dryRun ?? false,
       isHalted: () => options.halted ?? false,
       stopContextFor: async (action) => stopContext({ action: action.type, ...options.stop }),
+      policyFor: async () => ({
+        verdict: 'ALLOW',
+        deferUntil: undefined,
+        modifications: [],
+        denialReasons: [],
+        evaluations: [],
+        policyVersion: 'test',
+        ...options.policy,
+      }),
       payloadFor: async () => ({ recipientRef: 'cust_1', body: 'your payment did not go through' }),
       ...(options.maxAttempts === undefined ? {} : { maxAttempts: options.maxAttempts }),
     })
@@ -279,6 +290,35 @@ describe('Executor', () => {
     const cases = await handle.db.select().from(riskCases)
     expect(cases[0]?.state).toBe('STOPPED')
     expect(cases[0]?.stopReason).toBe('STOP_OPT_OUT')
+  })
+
+  it('suppresses a send the policy gate denies at execute time', async () => {
+    await enqueueNudge()
+    const sender = new RecordingSender()
+    const stats = await build({
+      sender,
+      policy: { verdict: 'DENY', denialReasons: ['OPT_OUT_ABSOLUTE: the customer opted out'] },
+    }).drain(AT)
+
+    expect(stats.suppressed).toBe(1)
+    expect(sender.calls).toHaveLength(0)
+    const rows = await handle.db.select().from(actions)
+    expect(rows[0]?.status).toBe('SUPPRESSED')
+  })
+
+  it('reschedules a send the policy gate defers at execute time', async () => {
+    await enqueueNudge()
+    const sender = new RecordingSender()
+    const stats = await build({
+      sender,
+      policy: { verdict: 'DEFER', deferUntil: AT + 9 * 3_600_000 },
+    }).drain(AT)
+
+    expect(stats.deferred).toBe(1)
+    expect(sender.calls).toHaveLength(0)
+    const rows = await handle.db.select().from(actions)
+    expect(rows[0]?.status).toBe('SCHEDULED')
+    expect(rows[0]?.scheduledFor).toBe(AT + 9 * 3_600_000)
   })
 
   it('reschedules rather than sending when the stop gate defers at execute time', async () => {

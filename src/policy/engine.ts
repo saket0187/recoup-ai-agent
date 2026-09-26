@@ -17,7 +17,7 @@ export interface PolicyDecision {
   readonly policyVersion: string
 }
 
-const VERDICT_RANK: Record<PolicyVerdict, number> = { ALLOW: 0, DEFER: 1, MODIFY: 2, DENY: 3 }
+const VERDICT_RANK: Record<PolicyVerdict, number> = { ALLOW: 0, MODIFY: 1, DEFER: 2, DENY: 3 }
 
 function applies(rule: PolicyRuleConfig, context: PolicyContext): boolean {
   if (rule.applies_to === 'ALL') return true

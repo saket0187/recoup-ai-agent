@@ -59,6 +59,15 @@ function requireStrings(params: RuleParams, key: string): readonly string[] {
   return value as readonly string[]
 }
 
+function isMandateDebit(context: PolicyContext, params: RuleParams): boolean {
+  const method = context.instrumentMethod
+  return (
+    method !== undefined &&
+    context.mandateCapPaise !== undefined &&
+    requireStrings(params, 'mandate_methods').includes(method)
+  )
+}
+
 function nextMorning(at: number): number {
   return atIst(addIstDays(at, 1), 10)
 }
@@ -346,11 +355,7 @@ export const PREDICATES: Readonly<Record<string, RulePredicate>> = {
       : pass('no erasure request on file'),
 
   PRE_DEBIT_NOTICE: (context, params) => {
-    const method = context.instrumentMethod
-    const mandateMethods = requireStrings(params, 'mandate_methods')
-    if (method === undefined || !mandateMethods.includes(method)) {
-      return pass('not a mandate-backed debit')
-    }
+    if (!isMandateDebit(context, params)) return pass('not a mandate-backed debit')
     const noticeHours = requireNumber(params, 'notice_hours')
     const sentAt = context.preDebitNoticeSentAt
     if (sentAt === undefined) {
@@ -364,6 +369,11 @@ export const PREDICATES: Readonly<Record<string, RulePredicate>> = {
           sentAt + noticeHours * HOUR_MS,
         )
   },
+
+  MANDATE_REQUIRED: (context, params) =>
+    isMandateDebit(context, params)
+      ? pass('a standing mandate covers this debit')
+      : fail('no mandate on file, so the customer has to pay; send a payment link instead'),
 
   MANDATE_CAP: (context) => {
     const cap = context.mandateCapPaise

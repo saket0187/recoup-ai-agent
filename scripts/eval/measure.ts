@@ -16,6 +16,7 @@ const { values } = parseArgs({
     accounts: { type: 'string' },
     traffic: { type: 'string' },
     out: { type: 'string' },
+    seeds: { type: 'string' },
   },
 })
 
@@ -152,6 +153,43 @@ for (const ablation of ABLATIONS) {
   scenario.handle.close()
 }
 
+const extraSeeds =
+  values.seeds === undefined
+    ? Array.from({ length: 6 }, (_, index) => seed + index + 1)
+    : values.seeds
+        .split(',')
+        .filter((part) => part.trim() !== '')
+        .map(Number)
+
+interface SeedOutcome {
+  readonly seed: number
+  readonly result: MeasurementResult
+}
+
+const acrossSeeds: SeedOutcome[] = []
+const fullRun = outcomes.find((entry) => entry.ablation.id === 'full')
+if (fullRun !== undefined) acrossSeeds.push({ seed, result: fullRun.result })
+
+for (const extraSeed of extraSeeds) {
+  if (extraSeed === trainingSeed || extraSeed === seed) continue
+  process.stderr.write(`running the full agent on seed ${extraSeed}...\n`)
+  const scenario = await runScenario({
+    seed: extraSeed,
+    accounts,
+    trafficPerHour,
+    features: ALL_FEATURES,
+    label: `seed-${extraSeed}`,
+  })
+  const result = await measure(
+    scenario.handle.db,
+    MERCHANT_ID,
+    scenario.authority,
+    createRng(extraSeed).derive('bootstrap-full'),
+  )
+  acrossSeeds.push({ seed: extraSeed, result })
+  scenario.handle.close()
+}
+
 const money = (value: number): string => formatINRCompact(paise(Math.round(value)))
 const pct = (value: number): string => `${(value * 100).toFixed(1)}%`
 
@@ -179,6 +217,51 @@ if (upliftModelVersion !== undefined) {
           `seed this report evaluates. These figures are training-set performance and overstate the ` +
           `model. Re-run with a different \`--seed\` for an honest estimate.`
       : `Uplift model \`${upliftModelVersion}\`, evaluated out of sample on seed \`${seed}\`.`,
+  )
+  lines.push('')
+}
+
+const messagesPerCase = (arm: MeasurementResult['treatment']): number =>
+  arm.touches / Math.max(1, arm.cases)
+const averageOf = (pick: (result: MeasurementResult) => number): number =>
+  acrossSeeds.reduce((sum, entry) => sum + pick(entry.result), 0) / Math.max(1, acrossSeeds.length)
+const aheadOn = acrossSeeds.filter(
+  (entry) => entry.result.stratifiedRecoveredFraction.estimate > 0,
+).length
+const ppOf = (value: number): string => `${(value * 100).toFixed(2)}pp`
+
+if (acrossSeeds.length > 1) {
+  lines.push('## Across held-out seeds')
+  lines.push('')
+  lines.push(
+    `The full agent against its randomised control on ${acrossSeeds.length} seeds the model never saw. One seed`,
+  )
+  lines.push(
+    'has only about 130 control cases, so a single seed swings by several points; the average',
+  )
+  lines.push('across seeds is the steadier read.')
+  lines.push('')
+  lines.push(
+    '| Seed | Recovered fraction | Net ₹ per case | Recovery rate T vs C | Messages per case T vs C | Agent ahead |',
+  )
+  lines.push('|---|---:|---:|---|---|---|')
+  for (const { seed: rowSeed, result } of acrossSeeds) {
+    lines.push(
+      `| ${rowSeed} | ${ppOf(result.stratifiedRecoveredFraction.estimate)} | ` +
+        `${money(result.incrementalNetValuePerCasePaise.estimate)} | ` +
+        `${pct(result.treatment.recoveryRate.estimate)} vs ${pct(result.control.recoveryRate.estimate)} | ` +
+        `${messagesPerCase(result.treatment).toFixed(2)} vs ${messagesPerCase(result.control).toFixed(2)} | ` +
+        `${result.stratifiedRecoveredFraction.estimate > 0 ? 'yes' : 'no'} |`,
+    )
+  }
+  lines.push(
+    `| **Average** | **${ppOf(averageOf((result) => result.stratifiedRecoveredFraction.estimate))}** | ` +
+      `**${money(averageOf((result) => result.incrementalNetValuePerCasePaise.estimate))}** | ` +
+      `**${pct(averageOf((result) => result.treatment.recoveryRate.estimate))} vs ` +
+      `${pct(averageOf((result) => result.control.recoveryRate.estimate))}** | ` +
+      `${averageOf((result) => messagesPerCase(result.treatment)).toFixed(2)} vs ` +
+      `${averageOf((result) => messagesPerCase(result.control)).toFixed(2)} | ` +
+      `**${aheadOn} of ${acrossSeeds.length}** |`,
   )
   lines.push('')
 }
@@ -314,7 +397,7 @@ for (const { ablation, result } of outcomes) {
 }
 lines.push('')
 lines.push(
-  'A policy violation is a message that was actually sent despite a `DENY` recorded against it.',
+  'A policy violation is a message that was actually sent despite a `DENY` or `DEFER` recorded against it.',
 )
 lines.push('Under the full agent this must be zero. The no-policy row is the counterfactual: it is')
 lines.push('the same engine with compliance removed, and it exists to make the trade-off visible.')
@@ -366,6 +449,13 @@ if (inSample) {
 }
 
 console.log(`\nwrote ${outPath}\n`)
+if (acrossSeeds.length > 1) {
+  console.log(
+    `  across ${acrossSeeds.length} held-out seeds: ahead on ${aheadOn}, average ` +
+      `${ppOf(averageOf((result) => result.stratifiedRecoveredFraction.estimate))} recovered fraction, ` +
+      `${money(averageOf((result) => result.incrementalNetValuePerCasePaise.estimate))} net per case\n`,
+  )
+}
 if (baseline !== undefined) {
   console.log('  layer contribution (full agent minus the version without it):')
   for (const { ablation, result } of outcomes) {
@@ -408,4 +498,4 @@ for (const { ablation, result } of outcomes) {
       `${excludesZero(fraction) ? '  significant' : ''}`,
   )
 }
-console.log('')
+process.stdout.write('\n', () => process.exit(0))

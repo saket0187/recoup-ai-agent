@@ -89,6 +89,10 @@ export function candidatesFor(inputs: PlaybookInputs): CandidateSpec[] {
 
     case 'AUTH_DROPOFF':
       candidates.push(
+        silent(
+          'RETRY_CHARGE',
+          'a mandate debit needs no fresh authentication, so a silent retry can clear it',
+        ),
         contact(
           'SEND_PAYMENT_LINK',
           channel,

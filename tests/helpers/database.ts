@@ -45,6 +45,7 @@ export async function seedCase(
     at?: number
     arm?: 'TREATMENT' | 'CONTROL'
     languagePref?: 'en' | 'hi' | 'hinglish'
+    mandateCapPaise?: number
   } = {},
 ): Promise<SeededCase> {
   const merchantId = options.merchantId ?? 'merch_test'
@@ -59,6 +60,7 @@ export async function seedCase(
     externalRef: `ext_${customerId}`,
     portfolio: 'd2c_subscription',
     languagePref: options.languagePref ?? 'en',
+    mandateCapPaise: options.mandateCapPaise ?? null,
     createdAt: at,
   })
 

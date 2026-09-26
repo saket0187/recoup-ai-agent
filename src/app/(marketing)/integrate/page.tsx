@@ -25,7 +25,7 @@ src/providers/port.ts               # the interface both implement`,
   {
     title: 'Tune the limits to your business',
     body: 'Anything with a threshold, cap, or rate is configuration rather than code, so changing policy does not mean changing the engine.',
-    code: `config/policy.yaml      # 35 compliance rules: quiet hours, consent, frequency
+    code: `config/policy.yaml      # 36 compliance rules: quiet hours, consent, frequency
 config/authority.yaml   # touch and retry caps, discount ceilings, cycle budgets
 config/costs.yaml       # channel and action costs, margin rate
 config/templates.yaml   # message templates in English, Hindi, Hinglish
@@ -35,9 +35,9 @@ config/calendar.yaml    # bank holidays and festival windows`,
 
 const RESPONSES = [
   ['202', 'Verified, stored, and projected into a case'],
+  ['202', 'Verified but unreadable, so stored as a dead letter with the reason'],
   ['401', 'Signature does not match the raw body'],
   ['413', 'Body over 256KB'],
-  ['422', 'Schema mismatch, with the exact fields listed'],
   ['503', 'GATEWAY_WEBHOOK_SECRET is not configured'],
 ] as const
 
@@ -98,7 +98,7 @@ export default function Integrate(): React.ReactElement {
               </thead>
               <tbody>
                 {RESPONSES.map(([code, meaning]) => (
-                  <tr key={code}>
+                  <tr key={meaning}>
                     <td
                       className="num"
                       style={{ color: code === '202' ? 'var(--ok)' : 'var(--bad)' }}

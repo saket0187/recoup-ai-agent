@@ -128,6 +128,8 @@ export const riskCases = sqliteTable(
     stratum: text('stratum').notNull(),
     cohortId: text('cohort_id'),
     disputeOpenedAt: integer('dispute_opened_at'),
+    humanApprovedAt: integer('human_approved_at'),
+    humanApprovedBy: text('human_approved_by'),
     attemptCount: integer('attempt_count').notNull().default(0),
     touchCount: integer('touch_count').notNull().default(0),
     recoveredPaise: integer('recovered_paise').notNull().default(0),
@@ -436,8 +438,27 @@ export const banditArms = sqliteTable(
   ],
 )
 
+export const unmatchedPayments = sqliteTable(
+  'unmatched_payments',
+  {
+    providerRef: text('provider_ref').primaryKey(),
+    merchantId: text('merchant_id')
+      .notNull()
+      .references(() => merchants.id),
+    reference: text('reference').notNull(),
+    amountPaise: integer('amount_paise').notNull(),
+    at: integer('at').notNull(),
+  },
+  (t) => [
+    index('unmatched_payments_reference_idx').on(t.merchantId, t.reference),
+    index('unmatched_payments_at_idx').on(t.merchantId, t.at),
+    check('unmatched_payments_amount_ck', sql`${t.amountPaise} > 0`),
+  ],
+)
+
 export const schema = {
   banditArms,
+  unmatchedPayments,
   merchants,
   customers,
   consentRecords,

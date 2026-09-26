@@ -211,13 +211,13 @@ export async function measure(
     const sentActions = sentByDecision.get(decision.id)
     if (sentActions === undefined) continue
 
-    const deniedAndSent = decision.policyEvaluations.some(
+    const blockedAndSent = decision.policyEvaluations.some(
       (evaluation) =>
-        evaluation.verdict === 'DENY' &&
+        (evaluation.verdict === 'DENY' || evaluation.verdict === 'DEFER') &&
         evaluation.action !== undefined &&
         sentActions.has(`${evaluation.action}:${evaluation.channel ?? ''}`),
     )
-    if (deniedAndSent) policyViolations++
+    if (blockedAndSent) policyViolations++
   }
 
   const withPropensity = decisionRows.filter(

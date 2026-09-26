@@ -1,12 +1,29 @@
 # Measurement report
 
-Seed `43`, 1200 synthetic accounts per arm, bootstrap of 1,000 resamples for every interval.
+Seed `43`, 600 synthetic accounts per arm, bootstrap of 1,000 resamples for every interval.
 
 Every figure below comes from a simulated world whose constants are assumptions, not
 measurements. They are documented in `docs/simulation-assumptions.md`. Treat the sign and
 the ordering as the claim; do not quote the rupee figures as though they were observed.
 
-Uplift model `seed-42-c473e5fa2342`, evaluated out of sample on seed `43`.
+Uplift model `seed-42-45280de5ea5f`, evaluated out of sample on seed `43`.
+
+## Across held-out seeds
+
+The full agent against its randomised control on 7 seeds the model never saw. One seed
+has only about 130 control cases, so a single seed swings by several points; the average
+across seeds is the steadier read.
+
+| Seed | Recovered fraction | Net ₹ per case | Recovery rate T vs C | Messages per case T vs C | Agent ahead |
+|---|---:|---:|---|---|---|
+| 43 | -2.25pp | ₹670.03 | 15.3% vs 17.2% | 1.15 vs 0.75 | no |
+| 44 | 1.04pp | ₹237.27 | 15.0% vs 13.8% | 1.28 vs 0.80 | yes |
+| 45 | 4.13pp | ₹720.89 | 14.4% vs 10.8% | 1.10 vs 0.63 | yes |
+| 46 | -1.08pp | -₹55.60 | 14.3% vs 14.0% | 1.29 vs 0.87 | no |
+| 47 | 3.15pp | ₹174.52 | 17.4% vs 12.7% | 1.17 vs 0.63 | yes |
+| 48 | 3.69pp | ₹316.70 | 20.9% vs 16.4% | 1.30 vs 0.92 | yes |
+| 49 | 2.66pp | ₹37.28 | 16.4% vs 16.4% | 1.19 vs 0.90 | yes |
+| **Average** | **1.62pp** | **₹300.15** | **16.3% vs 14.5%** | 1.21 vs 0.79 | **5 of 7** |
 
 ## Headline: incremental recovery against a randomised control
 
@@ -21,42 +38,42 @@ quantity with less variance, so it is the column to read.
 
 | Configuration | Incremental ₹/case | 95% interval | Fraction | 95% interval | Stratified | 95% interval | Significant |
 |---|---:|---|---:|---|---:|---|---|
-| Full agent | ₹1.42k | [-₹7.05k, ₹9.59k] | 2.14pp | [-4.07, 8.40]pp | 1.62pp | [-3.09, 5.88]pp | no |
-| Without timing | ₹1.36k | [-₹7.98k, ₹10.32k] | 2.43pp | [-3.36, 8.73]pp | 1.89pp | [-2.50, 6.20]pp | no |
-| Without diagnosis | ₹1.31k | [-₹7.43k, ₹10.95k] | 1.60pp | [-4.46, 7.28]pp | 1.30pp | [-2.90, 5.13]pp | no |
-| Without uplift | ₹1.38k | [-₹8.81k, ₹10.42k] | 1.85pp | [-4.50, 8.20]pp | 1.33pp | [-3.08, 5.43]pp | no |
-| Without the policy gate | ₹10.2k | [-₹1.01k, ₹22.85k] | 5.02pp | [-0.26, 10.80]pp | 4.54pp | [-0.55, 9.20]pp | no |
-| Without the reviewer | ₹1.42k | [-₹7.17k, ₹10.17k] | 2.14pp | [-3.72, 8.29]pp | 1.62pp | [-2.85, 5.93]pp | no |
-| Without allocation | ₹1.42k | [-₹8.42k, ₹9.63k] | 2.14pp | [-3.72, 7.95]pp | 1.62pp | [-3.16, 5.65]pp | no |
-| Without the action-skill gate | ₹1.41k | [-₹7.79k, ₹9.82k] | 2.64pp | [-3.17, 8.62]pp | 2.05pp | [-2.18, 6.23]pp | no |
-| Without the incumbent floor | ₹1.05k | [-₹8.19k, ₹9.42k] | -4.14pp | [-9.97, 1.50]pp | -5.08pp | [-9.52, -1.06]pp | **yes** |
+| Full agent | ₹670.18 | [-₹69.41, ₹1.4k] | -1.85pp | [-9.28, 5.42]pp | -2.25pp | [-10.85, 4.66]pp | no |
+| Without timing | ₹665.48 | [-₹79.15, ₹1.36k] | -2.45pp | [-10.48, 4.45]pp | -2.88pp | [-11.41, 3.99]pp | no |
+| Without diagnosis | ₹560.94 | [-₹180.10, ₹1.24k] | -3.38pp | [-10.84, 3.92]pp | -3.83pp | [-12.84, 3.04]pp | no |
+| Without uplift | ₹662.60 | [-₹50.59, ₹1.36k] | -2.45pp | [-10.09, 4.66]pp | -3.15pp | [-11.68, 3.33]pp | no |
+| Without the policy gate | ₹352.74 | [-₹265.99, ₹904.12] | 6.04pp | [2.13, 9.60]pp | 5.87pp | [2.50, 9.59]pp | **yes** |
+| Without the reviewer | ₹670.18 | [-₹83.95, ₹1.33k] | -1.85pp | [-9.31, 5.23]pp | -2.25pp | [-11.30, 4.44]pp | no |
+| Without allocation | ₹670.18 | [-₹90.57, ₹1.35k] | -1.85pp | [-9.50, 5.21]pp | -2.25pp | [-11.35, 4.93]pp | no |
+| Without the action-skill gate | ₹719.72 | [₹38.84, ₹1.38k] | -1.68pp | [-8.93, 5.12]pp | -2.14pp | [-10.28, 4.61]pp | no |
+| Without the incumbent floor | ₹395.74 | [-₹314.56, ₹1.08k] | -4.86pp | [-12.12, 2.03]pp | -5.71pp | [-13.42, 2.11]pp | no |
 
 Recovery bought with spend is not the same as recovery. The engine maximises value
 net of what it spends, so this is the estimator that scores it on its own objective.
 
 | Configuration | Incremental net ₹/case | 95% interval | Significant | Spend/case T vs C |
 |---|---:|---|---|---|
-| Full agent | ₹1.42k | [-₹7.78k, ₹10.12k] | no | ₹0.49 vs ₹0.04 |
-| Without timing | ₹1.36k | [-₹8.31k, ₹10.05k] | no | ₹0.50 vs ₹0.04 |
-| Without diagnosis | ₹1.31k | [-₹7.73k, ₹10.11k] | no | ₹0.03 vs ₹0.05 |
-| Without uplift | ₹1.38k | [-₹8.21k, ₹9.88k] | no | ₹0.57 vs ₹0.04 |
-| Without the policy gate | ₹10.2k | [-₹1.62k, ₹21.65k] | no | ₹0.86 vs ₹0.14 |
-| Without the reviewer | ₹1.42k | [-₹7.91k, ₹10.43k] | no | ₹0.49 vs ₹0.04 |
-| Without allocation | ₹1.42k | [-₹6.92k, ₹10.18k] | no | ₹0.49 vs ₹0.04 |
-| Without the action-skill gate | ₹1.41k | [-₹7.92k, ₹10.49k] | no | ₹0.50 vs ₹0.04 |
-| Without the incumbent floor | ₹1.05k | [-₹8.73k, ₹9.27k] | no | ₹0.53 vs ₹0.04 |
+| Full agent | ₹670.03 | [-₹63.48, ₹1.36k] | no | ₹0.38 vs ₹0.23 |
+| Without timing | ₹665.32 | [-₹31.35, ₹1.38k] | no | ₹0.39 vs ₹0.23 |
+| Without diagnosis | ₹561.07 | [-₹95.90, ₹1.28k] | no | ₹0.10 vs ₹0.23 |
+| Without uplift | ₹662.40 | [-₹51.68, ₹1.31k] | no | ₹0.42 vs ₹0.23 |
+| Without the policy gate | ₹352.49 | [-₹241.44, ₹917.88] | no | ₹0.54 vs ₹0.29 |
+| Without the reviewer | ₹670.03 | [-₹31.52, ₹1.37k] | no | ₹0.38 vs ₹0.23 |
+| Without allocation | ₹670.03 | [-₹118.60, ₹1.39k] | no | ₹0.38 vs ₹0.23 |
+| Without the action-skill gate | ₹719.55 | [₹39.95, ₹1.42k] | **yes** | ₹0.37 vs ₹0.20 |
+| Without the incumbent floor | ₹395.58 | [-₹339.45, ₹1.01k] | no | ₹0.38 vs ₹0.23 |
 
 | Configuration | Recovery rate T vs C | Cases T / C |
 |---|---|---|
-| Full agent | 46.8% vs 44.7% | 1386 / 329 |
-| Without timing | 47.1% vs 44.7% | 1386 / 329 |
-| Without diagnosis | 46.9% vs 45.3% | 1386 / 329 |
-| Without uplift | 46.5% vs 44.7% | 1386 / 329 |
-| Without the policy gate | 56.5% vs 51.5% | 1387 / 328 |
-| Without the reviewer | 46.8% vs 44.7% | 1386 / 329 |
-| Without allocation | 46.8% vs 44.7% | 1386 / 329 |
-| Without the action-skill gate | 47.3% vs 44.7% | 1386 / 329 |
-| Without the incumbent floor | 40.5% vs 44.7% | 1386 / 329 |
+| Full agent | 15.3% vs 17.2% | 502 / 128 |
+| Without timing | 14.7% vs 17.2% | 502 / 128 |
+| Without diagnosis | 13.9% vs 17.3% | 502 / 127 |
+| Without uplift | 14.7% vs 17.2% | 502 / 128 |
+| Without the policy gate | 8.4% vs 2.3% | 501 / 128 |
+| Without the reviewer | 15.3% vs 17.2% | 502 / 128 |
+| Without allocation | 15.3% vs 17.2% | 502 / 128 |
+| Without the action-skill gate | 13.9% vs 15.6% | 502 / 128 |
+| Without the incumbent floor | 11.6% vs 16.4% | 502 / 128 |
 
 ## What each layer contributes
 
@@ -66,14 +83,14 @@ than either configuration against control, because it removes the between-world 
 
 | Layer removed | Change in recovered fraction | 95% interval | Layer earns its place |
 |---|---:|---|---|
-| Without timing | -0.29pp | [-4.03, 3.61]pp | not detectable |
-| Without diagnosis | -0.07pp | [-3.67, 3.74]pp | not detectable |
-| Without uplift | 0.29pp | [-3.46, 4.17]pp | not detectable |
-| Without the policy gate | -9.69pp | [-13.44, -5.75]pp | **no, it costs recovery** |
-| Without the reviewer | 0.00pp | [-3.79, 3.59]pp | not detectable |
-| Without allocation | 0.00pp | [-3.68, 3.69]pp | not detectable |
-| Without the action-skill gate | -0.51pp | [-4.26, 3.30]pp | not detectable |
-| Without the incumbent floor | 6.27pp | [2.59, 9.86]pp | **yes** |
+| Without timing | 0.60pp | [-3.59, 5.18]pp | not detectable |
+| Without diagnosis | 1.39pp | [-3.00, 5.58]pp | not detectable |
+| Without uplift | 0.60pp | [-3.58, 4.98]pp | not detectable |
+| Without the policy gate | 6.95pp | [2.57, 10.94]pp | **yes** |
+| Without the reviewer | 0.00pp | [-4.97, 4.58]pp | not detectable |
+| Without allocation | 0.00pp | [-4.38, 4.38]pp | not detectable |
+| Without the action-skill gate | 1.39pp | [-3.18, 5.78]pp | not detectable |
+| Without the incumbent floor | 3.78pp | [-0.40, 7.97]pp | not detectable |
 
 A positive change means the full agent recovers more than the version without that layer,
 so the layer is pulling its weight.
@@ -82,17 +99,17 @@ so the layer is pulling its weight.
 
 | Configuration | Touches per case | Opt-outs | False dunning | Over-contact | Policy violations |
 |---|---:|---:|---:|---:|---:|
-| Full agent | 1.14 | 57 | 0 | 0 | 0 |
-| Without timing | 1.15 | 54 | 0 | 0 | 0 |
-| Without diagnosis | 0.20 | 2 | 0 | 0 | 0 |
-| Without uplift | 1.32 | 61 | 0 | 0 | 0 |
-| Without the policy gate | 1.86 | 88 | 0 | 0 | 4407 |
-| Without the reviewer | 1.14 | 57 | 0 | 0 | 0 |
-| Without allocation | 1.14 | 57 | 0 | 0 | 0 |
-| Without the action-skill gate | 1.15 | 53 | 0 | 0 | 0 |
-| Without the incumbent floor | 1.17 | 52 | 0 | 0 | 0 |
+| Full agent | 1.15 | 15 | 0 | 0 | 0 |
+| Without timing | 1.15 | 14 | 0 | 0 | 0 |
+| Without diagnosis | 0.63 | 3 | 0 | 0 | 0 |
+| Without uplift | 1.29 | 20 | 0 | 0 | 0 |
+| Without the policy gate | 1.34 | 20 | 0 | 0 | 943 |
+| Without the reviewer | 1.15 | 15 | 0 | 0 | 0 |
+| Without allocation | 1.15 | 15 | 0 | 0 | 0 |
+| Without the action-skill gate | 1.12 | 16 | 0 | 0 | 0 |
+| Without the incumbent floor | 1.05 | 17 | 0 | 0 | 0 |
 
-A policy violation is a message that was actually sent despite a `DENY` recorded against it.
+A policy violation is a message that was actually sent despite a `DENY` or `DEFER` recorded against it.
 Under the full agent this must be zero. The no-policy row is the counterfactual: it is
 the same engine with compliance removed, and it exists to make the trade-off visible.
 
@@ -114,15 +131,15 @@ the same engine with compliance removed, and it exists to make the trade-off vis
 
 | Configuration | Decisions | Propensity coverage | Unmapped | Dead-lettered | Replay |
 |---|---:|---:|---:|---:|---:|
-| Full agent | 25846 | 100.0% | 3.5% | 0 | 49.1s |
-| Without timing | 25899 | 100.0% | 3.5% | 0 | 46.6s |
-| Without diagnosis | 25606 | 100.0% | 3.3% | 0 | 38.9s |
-| Without uplift | 26086 | 100.0% | 3.5% | 0 | 36.7s |
-| Without the policy gate | 26165 | 100.0% | 3.8% | 0 | 77.3s |
-| Without the reviewer | 25846 | 100.0% | 3.5% | 0 | 47.6s |
-| Without allocation | 25846 | 100.0% | 3.5% | 0 | 46.4s |
-| Without the action-skill gate | 25928 | 100.0% | 3.5% | 0 | 52.8s |
-| Without the incumbent floor | 27254 | 100.0% | 3.5% | 0 | 45.5s |
+| Full agent | 14911 | 100.0% | 3.6% | 0 | 25.9s |
+| Without timing | 14991 | 100.0% | 3.7% | 0 | 24.9s |
+| Without diagnosis | 14941 | 100.0% | 3.8% | 0 | 23.8s |
+| Without uplift | 15237 | 100.0% | 3.7% | 0 | 19.5s |
+| Without the policy gate | 34251 | 100.0% | 4.4% | 0 | 253.0s |
+| Without the reviewer | 14911 | 100.0% | 3.6% | 0 | 27.0s |
+| Without allocation | 14911 | 100.0% | 3.6% | 0 | 27.0s |
+| Without the action-skill gate | 14986 | 100.0% | 3.7% | 0 | 32.9s |
+| Without the incumbent floor | 15182 | 100.0% | 3.7% | 0 | 24.2s |
 
 ## Not measured here
 

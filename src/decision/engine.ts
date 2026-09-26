@@ -60,6 +60,12 @@ function sameAction(a: { action: ActionType; channel?: Channel }, b: CandidateSp
   return a.action === b.action && a.channel === b.channel
 }
 
+const NOTICE_CHANNELS: readonly Channel[] = ['SMS', 'EMAIL', 'WHATSAPP']
+
+function candidateKey(candidate: { action: ActionType; channel?: Channel | undefined }): string {
+  return `${candidate.action}|${candidate.channel ?? ''}`
+}
+
 export interface DecisionRequest {
   readonly at: number
   readonly caseId: string
@@ -233,8 +239,9 @@ export class DecisionEngine {
     const policyEvaluations: PolicyEvaluation[] = []
     const seenRules = new Set<string>()
     const scored: ScoredCandidate[] = []
+    const waitingOnNotice = new Set<string>()
 
-    for (const spec of specs) {
+    const evaluateSpec = (spec: CandidateSpec): ScoredCandidate => {
       const decision = this.policy.evaluate(request.policyContextFor(spec.action, spec.channel))
       const gated = this.features.policyGate
 
@@ -251,10 +258,17 @@ export class DecisionEngine {
         }
       }
 
+      const holds = decision.evaluations.filter(
+        (evaluation) => evaluation.verdict === 'DEFER' || evaluation.verdict === 'DENY',
+      )
+      if (gated && holds.length > 0 && holds.every((e) => e.ruleId === 'PRE_DEBIT_NOTICE')) {
+        waitingOnNotice.add(candidateKey(spec))
+      }
+
       const pSuccess = draw(spec.action)
       const { uplift, evPaise, costPaise } = this.score(request, spec, pSuccess, baseline)
 
-      scored.push({
+      return {
         action: spec.action,
         ...(spec.channel === undefined ? {} : { channel: spec.channel }),
         pSuccess,
@@ -266,6 +280,39 @@ export class DecisionEngine {
         modifications: decision.modifications,
         denialReasons: decision.denialReasons,
         deferUntil: decision.deferUntil,
+      }
+    }
+
+    for (const spec of specs) scored.push(evaluateSpec(spec))
+
+    const noticeSent =
+      request.policyContextFor('SEND_PRE_DEBIT_NOTICE', request.preferredChannel)
+        .preDebitNoticeSentAt !== undefined
+    const heldForNotice = noticeSent
+      ? []
+      : scored.filter((candidate) => waitingOnNotice.has(candidateKey(candidate)))
+
+    if (heldForNotice.length > 0) {
+      for (const channel of new Set<Channel>([request.preferredChannel, ...NOTICE_CHANNELS])) {
+        const offered = scored.some(
+          (candidate) =>
+            candidate.action === 'SEND_PRE_DEBIT_NOTICE' && candidate.channel === channel,
+        )
+        if (offered) continue
+        scored.push(
+          evaluateSpec({
+            action: 'SEND_PRE_DEBIT_NOTICE',
+            channel,
+            rationale: 'a retry is held only for the pre-debit notice, so send the notice first',
+          }),
+        )
+      }
+
+      const heldEv = Math.max(...heldForNotice.map((candidate) => candidate.evPaise))
+      scored.forEach((candidate, index) => {
+        if (candidate.action !== 'SEND_PRE_DEBIT_NOTICE') return
+        const unlocked = heldEv - candidate.costPaise
+        if (unlocked > candidate.evPaise) scored[index] = { ...candidate, evPaise: paise(unlocked) }
       })
     }
 
@@ -319,7 +366,16 @@ export class DecisionEngine {
           }))
 
     const fallbackAction: ActionType = (floor ?? fallback)?.action ?? 'WAIT'
-    const bestRemainingEv = best?.evPaise ?? paise(0)
+    const worthWaitingFor = scored.filter(
+      (candidate) =>
+        !candidate.admissible &&
+        candidate.deferUntil !== undefined &&
+        candidate.evPaise > 0 &&
+        !operationalSet.has(candidate.action),
+    )
+    const bestRemainingEv = paise(
+      Math.max(best?.evPaise ?? 0, ...worthWaitingFor.map((candidate) => candidate.evPaise)),
+    )
     const stop = evaluateStopGate(
       request.stopContextFor(chosen.action, bestRemainingEv),
       this.authority,
@@ -330,11 +386,16 @@ export class DecisionEngine {
       .filter((value): value is number => value !== undefined)
       .sort((a, b) => a - b)[0]
 
+    const wakeAt =
+      chosen.action === 'WAIT' && worthWaitingFor.length > 0
+        ? Math.min(...worthWaitingFor.map((candidate) => candidate.deferUntil ?? request.at))
+        : undefined
+
     const deferUntil =
       stop.verdict === 'DEFER'
         ? Math.max(stop.deferUntil ?? request.at, earliestDefer ?? request.at)
         : chosen.admissible
-          ? undefined
+          ? wakeAt
           : earliestDefer
 
     let finalVerdict: FinalVerdict = 'EXECUTE'
@@ -353,10 +414,13 @@ export class DecisionEngine {
     return {
       chosenAction: chosen.action,
       chosenChannel: chosen.channel,
-      chosenBy: this.modelRanked.has(`${chosen.action}|${chosen.channel ?? ''}`)
-        ? 'MODEL'
-        : 'PLAYBOOK',
-      propensity: this.propensityOf(request, scored, chosen.action, fallbackAction),
+      chosenBy:
+        request.arm === 'CONTROL'
+          ? 'SCHEDULE'
+          : this.modelRanked.has(`${chosen.action}|${chosen.channel ?? ''}`)
+            ? 'MODEL'
+            : 'PLAYBOOK',
+      propensity: this.propensityOf(request, scored, chosen.action, fallbackAction, heldForNotice),
       candidates: scored,
       policyEvaluations,
       stopEvaluations: stop.evaluations,
@@ -375,6 +439,7 @@ export class DecisionEngine {
     scored: readonly ScoredCandidate[],
     chosen: ActionType,
     deterministicFallback: ActionType,
+    heldForNotice: readonly ScoredCandidate[],
   ): number {
     const admissible = scored.filter((candidate) => candidate.admissible)
     if (admissible.length <= 1) return 1
@@ -382,22 +447,32 @@ export class DecisionEngine {
     if (request.arm === 'CONTROL') return 1
 
     const baseline = this.bandit.mean(this.armKey(request, 'WAIT'))
+    const sampled = (candidate: ScoredCandidate): { evPaise: Paise; costPaise: Paise } => {
+      const { alpha, beta } = this.bandit.posterior(this.armKey(request, candidate.action))
+      const pSuccess = this.propensityRng.beta(alpha, beta)
+      return this.score(
+        request,
+        { action: candidate.action, channel: candidate.channel, rationale: '' },
+        pSuccess,
+        baseline,
+      )
+    }
     let wins = 0
 
     for (let trial = 0; trial < PROPENSITY_SAMPLES; trial++) {
       let bestAction: ActionType | undefined
       let bestEv = paise(Number.MIN_SAFE_INTEGER)
+      const heldEv = Math.max(
+        Number.MIN_SAFE_INTEGER,
+        ...heldForNotice.map((candidate) => sampled(candidate).evPaise),
+      )
 
       for (const candidate of admissible) {
-        const key = this.armKey(request, candidate.action)
-        const { alpha, beta } = this.bandit.posterior(key)
-        const pSuccess = this.propensityRng.beta(alpha, beta)
-        const { evPaise } = this.score(
-          request,
-          { action: candidate.action, channel: candidate.channel, rationale: '' },
-          pSuccess,
-          baseline,
-        )
+        const draw = sampled(candidate)
+        const evPaise =
+          candidate.action === 'SEND_PRE_DEBIT_NOTICE'
+            ? paise(Math.max(draw.evPaise, heldEv - draw.costPaise))
+            : draw.evPaise
         if (evPaise > bestEv) {
           bestEv = evPaise
           bestAction = candidate.action

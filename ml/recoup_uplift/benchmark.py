@@ -50,7 +50,7 @@ def load_hillstrom(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise BenchmarkError("the benchmark needs pandas: pip install -e '.[benchmark]'") from error
 
     frame = pd.read_csv(path)
-    frame = frame[frame["segment"] != "No E-Mail"].copy()
+    frame = frame[frame["segment"] != "Womens E-Mail"].copy()
 
     treated = np.asarray(frame["segment"] == "Mens E-Mail", dtype=np.float64)
     y = np.asarray(frame["visit"], dtype=np.float64)

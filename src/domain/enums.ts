@@ -86,7 +86,7 @@ export type Channel = (typeof CHANNELS)[number]
 export const DIRECTIONS = ['OUTBOUND', 'INBOUND'] as const
 export type Direction = (typeof DIRECTIONS)[number]
 
-export const CHOSEN_BY = ['PLAYBOOK', 'MODEL', 'HUMAN'] as const
+export const CHOSEN_BY = ['PLAYBOOK', 'MODEL', 'HUMAN', 'SCHEDULE'] as const
 export type ChosenBy = (typeof CHOSEN_BY)[number]
 
 export const POLICY_VERDICTS = ['ALLOW', 'DEFER', 'DENY', 'MODIFY'] as const

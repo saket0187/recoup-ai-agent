@@ -6,7 +6,7 @@ import { createIdFactory } from '../src/core/identifiers'
 import { silentLogger } from '../src/core/logger'
 import { paise } from '../src/core/money'
 import type { DatabaseHandle } from '../src/db/client'
-import { diagnoses, riskCases } from '../src/db/schema'
+import { customers, diagnoses, riskCases, unmatchedPayments } from '../src/db/schema'
 import { StratifiedAssigner } from '../src/experiment/arm'
 import { LedgerRepository } from '../src/ledger/ledger'
 import { GatewayWebhookSource, signPayload } from '../src/providers/gateway/adapter'
@@ -266,6 +266,14 @@ describe('CaseProjector', () => {
     expect(rows[0]?.state).toBe('RECOVERED')
     expect(rows[0]?.recoveredPaise).toBe(250_000)
     expect(rows[0]?.resolvedAt).not.toBeNull()
+  })
+
+  it('opens no case and stores no customer for a payment that never failed', async () => {
+    await project(captureEvent({ paymentId: 'pay_2', amountPaise: 250_000 }), 'evt_2')
+
+    expect(await handle.db.select().from(riskCases)).toHaveLength(0)
+    expect(await handle.db.select().from(customers)).toHaveLength(0)
+    expect(await handle.db.select().from(unmatchedPayments)).toHaveLength(1)
   })
 
   it('reaches the same state whichever order the events arrive in', async () => {

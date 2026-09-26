@@ -62,6 +62,8 @@ const envSchema = z.object({
   SEED: envInteger(42, 0, Number.MAX_SAFE_INTEGER),
   CLOCK_MODE: z.enum(['VIRTUAL', 'REAL']).optional().default('VIRTUAL'),
   DB_PATH: envString('./data/recoup.db'),
+  WEBHOOK_SIGNATURE_HEADER: envString('x-recoup-signature'),
+  WEBHOOK_EVENT_ID_HEADER: envString('x-recoup-event-id'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional().default('info'),
 })
 
@@ -71,6 +73,8 @@ export interface AppConfig {
   readonly seed: number
   readonly clockMode: ClockMode
   readonly dbPath: string
+  readonly webhookSignatureHeader: string
+  readonly webhookEventIdHeader: string
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error'
 }
 
@@ -102,6 +106,8 @@ export function loadConfig(source: Record<string, string | undefined>): AppConfi
     seed: env.SEED,
     clockMode: env.CLOCK_MODE,
     dbPath: env.DB_PATH,
+    webhookSignatureHeader: env.WEBHOOK_SIGNATURE_HEADER,
+    webhookEventIdHeader: env.WEBHOOK_EVENT_ID_HEADER,
     logLevel: env.LOG_LEVEL,
   }
 }

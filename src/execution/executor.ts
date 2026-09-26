@@ -11,6 +11,7 @@ import type { Rng } from '../core/seeded-random'
 import type { Channel, StopReason } from '../domain/enums'
 import type { Database } from '../db/client'
 import { contactEvents, customers, riskCases, type ActionRow } from '../db/schema'
+import type { PolicyDecision } from '../policy/engine'
 import { evaluateStopGate, type StopContext } from '../policy/stop-gate'
 import type { MessageSender, PaymentExecutor } from '../providers/port'
 import type { Outbox } from './outbox'
@@ -37,6 +38,7 @@ export interface ExecutorOptions {
   readonly dryRun: boolean
   isHalted(): boolean
   stopContextFor(action: ActionRow, at: number): Promise<StopContext>
+  policyFor(action: ActionRow): Promise<PolicyDecision>
   payloadFor(action: ActionRow): Promise<DispatchPayload | undefined>
   readonly maxAttempts?: number
   readonly baseBackoffMs?: number
@@ -137,6 +139,28 @@ export class Executor {
         action.id,
         until,
         'deferred by the stop gate at execute time',
+      )
+      return 'DEFERRED'
+    }
+
+    const policy = await this.options.policyFor(action)
+
+    if (policy.verdict === 'DENY') {
+      const reason = policy.denialReasons[0] ?? 'denied by the policy gate at execute time'
+      await this.options.outbox.markSuppressed(action.id, reason, at)
+      this.options.logger.info('action_denied_at_execute_time', {
+        actionId: action.id,
+        caseId: action.caseId,
+        reason,
+      })
+      return 'SUPPRESSED'
+    }
+
+    if (policy.verdict === 'DEFER') {
+      await this.options.outbox.reschedule(
+        action.id,
+        policy.deferUntil ?? at + 60 * 60_000,
+        'deferred by the policy gate at execute time',
       )
       return 'DEFERRED'
     }

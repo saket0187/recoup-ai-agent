@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, lt } from 'drizzle-orm'
 
 import type { Clock } from '../core/clock'
 import type { IdFactory } from '../core/identifiers'
@@ -6,11 +6,24 @@ import type { Logger } from '../core/logger'
 import { paise, subP, type Paise } from '../core/money'
 import type { CaseType, FailureClass } from '../domain/enums'
 import type { Database } from '../db/client'
-import { customers, diagnoses, riskCases, type RiskCase } from '../db/schema'
+import { customers, diagnoses, riskCases, unmatchedPayments, type RiskCase } from '../db/schema'
 import { type StratifiedAssigner, stratumKey } from '../experiment/arm'
 import { LedgerRepository } from '../ledger/ledger'
 import { detectTdsShortfall } from '../ledger/tds'
-import type { RiskSignal } from '../providers/port'
+import type { RiskSignal, RiskSignalKind } from '../providers/port'
+
+const OPENING_SIGNALS: ReadonlySet<RiskSignalKind> = new Set([
+  'PAYMENT_FAILED',
+  'SUBSCRIPTION_HALTED',
+  'CHECKOUT_ABANDONED',
+])
+
+const SUCCESS_SIGNALS: ReadonlySet<RiskSignalKind> = new Set([
+  'PAYMENT_SUCCEEDED',
+  'SUBSCRIPTION_CHARGED',
+])
+
+const HELD_PAYMENT_RETENTION_MS = 3 * 86_400_000
 
 const CASE_TYPE_BY_ENTITY = (signal: RiskSignal): CaseType => {
   if (signal.kind === 'CHECKOUT_ABANDONED') return 'CHECKOUT_ABANDONED'
@@ -73,12 +86,24 @@ export class CaseProjector {
     const reference = this.referenceOf(signal)
     if (reference === undefined) return IGNORED
 
+    const existing = await this.findCase(reference)
+    if (existing !== undefined) {
+      await this.applySignal(signal, existing)
+      return this.settle(existing, false)
+    }
+
+    if (!OPENING_SIGNALS.has(signal.kind)) {
+      await this.holdUnmatchedPayment(signal, reference)
+      return IGNORED
+    }
+
     const customerId = await this.ensureCustomer(signal.customerRef)
-    const { row, created } = await this.ensureCase(signal, reference, customerId)
+    const row = await this.openCase(signal, reference, customerId)
     if (row === undefined) return IGNORED
 
     await this.applySignal(signal, row)
-    return this.settle(row, created)
+    await this.applyHeldPayments(row, reference)
+    return this.settle(row, true)
   }
 
   private referenceOf(signal: RiskSignal): string | undefined {
@@ -114,26 +139,26 @@ export class CaseProjector {
     return id
   }
 
-  private async ensureCase(
-    signal: RiskSignal,
-    reference: string,
-    customerId: string,
-  ): Promise<{ row: RiskCase | undefined; created: boolean }> {
-    const existing = await this.db
+  private async findCase(reference: string): Promise<RiskCase | undefined> {
+    const [found] = await this.db
       .select()
       .from(riskCases)
       .where(
         and(eq(riskCases.merchantId, this.merchantId), eq(riskCases.id, this.caseIdFor(reference))),
       )
       .limit(1)
+    return found
+  }
 
-    const found = existing[0]
-    if (found !== undefined) return { row: found, created: false }
-
+  private async openCase(
+    signal: RiskSignal,
+    reference: string,
+    customerId: string,
+  ): Promise<RiskCase | undefined> {
     const amount = signal.amountPaise ?? paise(0)
     if (amount <= 0) {
       this.logger.debug('signal_cannot_open_case', { reference, kind: signal.kind })
-      return { row: undefined, created: false }
+      return undefined
     }
 
     const failureClass: FailureClass | 'UNKNOWN' =
@@ -158,6 +183,8 @@ export class CaseProjector {
       cohortId:
         signal.method === undefined ? null : `${signal.method}|${signal.issuer ?? 'unknown'}`,
       disputeOpenedAt: null,
+      humanApprovedAt: null,
+      humanApprovedBy: null,
       attemptCount: 0,
       touchCount: 0,
       recoveredPaise: 0,
@@ -180,11 +207,59 @@ export class CaseProjector {
     })
 
     this.logger.info('case_opened', { caseId: row.id, arm: row.arm, stratum })
-    return { row, created: true }
+    return row
   }
 
   private caseIdFor(reference: string): string {
     return `case_${reference}`
+  }
+
+  private async holdUnmatchedPayment(signal: RiskSignal, reference: string): Promise<void> {
+    const providerRef = signal.entity.paymentId
+    const amount = signal.amountPaise
+    if (!SUCCESS_SIGNALS.has(signal.kind) || providerRef === undefined) return
+    if (amount === undefined || amount <= 0) return
+
+    await this.db
+      .delete(unmatchedPayments)
+      .where(
+        and(
+          eq(unmatchedPayments.merchantId, this.merchantId),
+          lt(unmatchedPayments.at, signal.occurredAt - HELD_PAYMENT_RETENTION_MS),
+        ),
+      )
+    await this.db
+      .insert(unmatchedPayments)
+      .values({
+        providerRef,
+        merchantId: this.merchantId,
+        reference,
+        amountPaise: amount,
+        at: signal.occurredAt,
+      })
+      .onConflictDoNothing()
+  }
+
+  private async applyHeldPayments(row: RiskCase, reference: string): Promise<void> {
+    const forReference = and(
+      eq(unmatchedPayments.merchantId, this.merchantId),
+      eq(unmatchedPayments.reference, reference),
+    )
+    const held = await this.db.select().from(unmatchedPayments).where(forReference)
+    if (held.length === 0) return
+
+    for (const payment of held) {
+      await this.ledger.append({
+        caseId: row.id,
+        merchantId: this.merchantId,
+        type: 'PAYMENT',
+        amountPaise: paise(payment.amountPaise),
+        at: payment.at,
+        providerRef: payment.providerRef,
+      })
+    }
+    await this.db.delete(unmatchedPayments).where(forReference)
+    this.logger.info('held_payments_applied', { caseId: row.id, payments: held.length })
   }
 
   private async applySignal(signal: RiskSignal, row: RiskCase): Promise<void> {

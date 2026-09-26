@@ -270,6 +270,10 @@ describe('playbook', () => {
       candidatesFor(inputs('AUTH_DROPOFF', { touchCount: 2 })).map((c) => c.action),
     ).not.toContain('SEND_NUDGE')
   })
+
+  it('offers a silent retry after an auth drop-off, left to the mandate rule to allow', () => {
+    expect(candidatesFor(inputs('AUTH_DROPOFF')).map((c) => c.action)).toContain('RETRY_CHARGE')
+  })
 })
 
 describe('control arm', () => {
@@ -368,8 +372,8 @@ describe('DecisionEngine', () => {
       isFestival: false,
       cohortPaused: false,
       instrumentMethod: 'upi',
-      mandateCapPaise: undefined,
-      preDebitNoticeSentAt: undefined,
+      mandateCapPaise: paise(5_000_000),
+      preDebitNoticeSentAt: NOW - 30 * HOUR,
       cardAttempts30d: 0,
       discountPct: undefined,
       discountPaise: undefined,
@@ -485,6 +489,60 @@ describe('DecisionEngine', () => {
     expect(outcome.chosenAction).toBe('RETRY_CHARGE')
   })
 
+  it('sends the pre-debit notice when that is all that holds a mandate retry back', () => {
+    const base = request()
+    const outcome = build().decide({
+      ...base,
+      policyContextFor: (action, channel) => ({
+        ...base.policyContextFor(action, channel),
+        preDebitNoticeSentAt: undefined,
+      }),
+    })
+    expect(outcome.chosenAction).toBe('SEND_PRE_DEBIT_NOTICE')
+    expect(outcome.finalVerdict).toBe('EXECUTE')
+  })
+
+  it('sends the notice on another channel when the preferred one has no consent', () => {
+    const base = request()
+    const outcome = build().decide({
+      ...base,
+      policyContextFor: (action, channel) => {
+        const context = base.policyContextFor(action, channel)
+        return {
+          ...context,
+          preDebitNoticeSentAt: undefined,
+          consentByChannel: {
+            ...context.consentByChannel,
+            WHATSAPP: { granted: false, purpose: 'payment_recovery', revokedAt: undefined },
+          },
+        }
+      },
+    })
+    expect(outcome.chosenAction).toBe('SEND_PRE_DEBIT_NOTICE')
+    expect(outcome.chosenChannel).not.toBe('WHATSAPP')
+  })
+
+  it('comes back when quiet hours end instead of waiting a whole day', () => {
+    const lateNight = fromIst(2026, 9, 15, 22)
+    const base = request({
+      at: lateNight,
+      failureClass: 'AUTH_DROPOFF',
+      firstSeenAt: lateNight - HOUR,
+    })
+    const outcome = build().decide({
+      ...base,
+      policyContextFor: (action, channel) => ({
+        ...base.policyContextFor(action, channel),
+        at: lateNight,
+        mandateCapPaise: undefined,
+      }),
+    })
+
+    expect(outcome.chosenAction).toBe('WAIT')
+    expect(outcome.finalVerdict).toBe('DEFER')
+    expect(outcome.deferUntil).toBe(fromIst(2026, 9, 16, 9))
+  })
+
   it('falls back to waiting when nothing clears its cost and the incumbent is not due', () => {
     const outcome = build().decide(
       request({ outstandingPaise: paise(3_000), firstSeenAt: NOW - HOUR }),
@@ -591,8 +649,8 @@ describe('the control arm is a baseline, not an agent', () => {
       isFestival: false,
       cohortPaused: false,
       instrumentMethod: 'upi',
-      mandateCapPaise: undefined,
-      preDebitNoticeSentAt: undefined,
+      mandateCapPaise: paise(5_000_000),
+      preDebitNoticeSentAt: NOW - 30 * HOUR,
       cardAttempts30d: 0,
       discountPct: undefined,
       discountPaise: undefined,
@@ -684,6 +742,23 @@ describe('the control arm is a baseline, not an agent', () => {
     const dear = controlEngine(expensive).decide(base)
 
     expect(cheap.chosenAction).toBe(dear.chosenAction)
+  })
+
+  it('sends the notice on its fixed schedule instead of stalling a mandate retry', () => {
+    const base = requestFor('CONTROL')
+    const outcome = controlEngine(costs).decide({
+      ...base,
+      policyContextFor: (action, channel) => ({
+        ...base.policyContextFor(action, channel),
+        preDebitNoticeSentAt: undefined,
+      }),
+    })
+    expect(outcome.chosenAction).toBe('SEND_PRE_DEBIT_NOTICE')
+  })
+
+  it('labels control-arm choices as the fixed schedule, never the model', () => {
+    expect(controlEngine(costs).decide(requestFor('CONTROL')).chosenBy).toBe('SCHEDULE')
+    expect(controlEngine(costs).decide(requestFor('TREATMENT')).chosenBy).not.toBe('SCHEDULE')
   })
 
   it('stops the treatment arm reaching for a channel once contact is priced out', () => {

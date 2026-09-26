@@ -54,7 +54,7 @@ export const GLOSSARY = {
   policyGate: {
     title: 'Policy gate',
     plain:
-      '35 compliance rules covering quiet hours, consent, do-not-disturb, and how often we may contact someone.',
+      '36 compliance rules covering quiet hours, consent, do-not-disturb, and how often we may contact someone.',
     why: 'It is deterministic code, not a model. Nothing can talk it round, and a rule that errors counts as a refusal.',
   },
   wilson: {

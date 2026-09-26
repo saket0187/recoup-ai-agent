@@ -9,13 +9,13 @@ or because the assumed annoyance cost is too large relative to the uplift it can
 
 | Annoyance scale | Incremental fraction | 95% interval | Significant | Touches/case | Opt-outs | Recovery T vs C |
 |---:|---:|---|---|---:|---:|---|
-| 0 | -0.11pp | [-6.68, 7.01]pp | no | 0.92 | 40 | 35.5% vs 35.7% |
-| 0.1 | -0.63pp | [-7.82, 6.17]pp | no | 0.81 | 24 | 36.1% vs 36.8% |
-| 0.25 | -8.93pp | [-16.77, -1.23]pp | **yes** | 0.60 | 22 | 36.2% vs 45.1% |
-| 0.5 | 3.17pp | [-3.62, 9.28]pp | no | 0.58 | 18 | 37.2% vs 34.0% |
-| 1 | -0.69pp | [-7.79, 5.71]pp | no | 0.45 | 19 | 36.1% vs 36.9% |
-| 2 | -0.61pp | [-7.92, 6.25]pp | no | 0.39 | 12 | 37.3% vs 37.9% |
-| 4 | 2.59pp | [-4.17, 9.31]pp | no | 0.30 | 9 | 38.7% vs 36.1% |
+| 0 | -0.50pp | [-7.12, 5.37]pp | no | 1.48 | 36 | 14.8% vs 15.3% |
+| 0.1 | -0.50pp | [-6.42, 5.67]pp | no | 1.46 | 33 | 14.8% vs 15.3% |
+| 0.25 | -0.33pp | [-6.46, 5.84]pp | no | 1.34 | 29 | 15.0% vs 15.3% |
+| 0.5 | -0.58pp | [-6.55, 5.25]pp | no | 1.31 | 34 | 14.1% vs 14.6% |
+| 1 | 0.30pp | [-5.87, 6.43]pp | no | 1.19 | 25 | 15.0% vs 14.6% |
+| 2 | 0.35pp | [-6.01, 7.11]pp | no | 1.03 | 19 | 14.4% vs 14.0% |
+| 4 | -0.03pp | [-6.73, 5.79]pp | no | 0.87 | 12 | 14.1% vs 14.1% |
 
 Opt-outs are the price of the extra contact. Read the two columns together: a scale that
 recovers more while opting out many more customers has not found free money, it has

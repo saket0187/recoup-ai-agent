@@ -76,7 +76,7 @@ npm run ml:benchmark
 ```
 
 Downloads the Hillstrom MineThatData email trial. A real randomised experiment
-over 42,694 customers, and scores the learners out of fold. It exists to test
+over 42,613 customers (the men's e-mail against no e-mail), and scores the learners out of fold. It exists to test
 the learner code and the Qini implementation against real data rather than
 against our own simulator. It says nothing about the payments domain.
 

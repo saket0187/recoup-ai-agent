@@ -19,7 +19,7 @@ import { AttributionTracker } from '../decision/feedback'
 import { AuditChain } from '../db/audit-chain'
 import type { Database } from '../db/client'
 import { and, eq, isNull, lt, or } from 'drizzle-orm'
-import { cohorts, merchants } from '../db/schema'
+import { cohorts, merchants, riskCases } from '../db/schema'
 import type { Channel } from '../domain/enums'
 import { ContextBuilder, type WorldFacts } from '../engine/context-builder'
 import { Orchestrator, type CycleStats } from '../engine/orchestrator'
@@ -78,10 +78,13 @@ export interface TickStats {
   readonly snapshot: readonly CohortHealth[]
 }
 
+export type ApprovalOutcome = 'APPROVED' | 'ALREADY_APPROVED' | 'NOT_FOUND'
+
 export interface Agent {
   restore(): Promise<number>
   ingest(request: ReceiveRequest): Promise<ReceiveOutcome>
   tick(at?: number): Promise<TickStats>
+  approve(caseId: string, approvedBy: string): Promise<ApprovalOutcome>
   readonly clock: Clock
   readonly detector: DegradationDetector
   readonly bandit: ThompsonBandit
@@ -164,6 +167,8 @@ export function composeAgent(ports: AgentPorts): Agent {
     authority,
   })
 
+  const policy = new PolicyEngine(policyConfig, authority, bankHolidays)
+
   const orchestrator = new Orchestrator({
     db: ports.db,
     clock: ports.clock,
@@ -172,7 +177,7 @@ export function composeAgent(ports: AgentPorts): Agent {
     logger: ports.logger,
     merchantId: ports.merchantId,
     merchantName: ports.merchantName,
-    policy: new PolicyEngine(policyConfig, authority, bankHolidays),
+    policy,
     authority,
     costs,
     bandit,
@@ -202,6 +207,13 @@ export function composeAgent(ports: AgentPorts): Agent {
       const view = await contexts.load(action.caseId)
       if (view === undefined) throw new Error(`case ${action.caseId} vanished before execution`)
       return contexts.stopContext(view, action.type, paise(action.bestRemainingEvPaise))
+    },
+    policyFor: async (action) => {
+      const view = await contexts.load(action.caseId)
+      if (view === undefined) throw new Error(`case ${action.caseId} vanished before execution`)
+      return policy.evaluate(
+        contexts.policyContext(view, action.type, action.channel ?? undefined, undefined),
+      )
     },
     payloadFor: async (action) => {
       const view = await contexts.load(action.caseId)
@@ -344,10 +356,39 @@ export function composeAgent(ports: AgentPorts): Agent {
     return { cycle, drain, inbound: inboundStats, promisesBroken, incidents, snapshot }
   }
 
+  async function approve(caseId: string, approvedBy: string): Promise<ApprovalOutcome> {
+    const [row] = await ports.db
+      .select({ approvedAt: riskCases.humanApprovedAt })
+      .from(riskCases)
+      .where(and(eq(riskCases.id, caseId), eq(riskCases.merchantId, ports.merchantId)))
+      .limit(1)
+    if (row === undefined) return 'NOT_FOUND'
+    if (row.approvedAt !== null) return 'ALREADY_APPROVED'
+
+    const at = ports.clock.now()
+    await ports.db
+      .update(riskCases)
+      .set({ humanApprovedAt: at, humanApprovedBy: approvedBy, nextDecisionAt: at, updatedAt: at })
+      .where(eq(riskCases.id, caseId))
+    await audit.append({
+      merchantId: ports.merchantId,
+      entryType: 'HUMAN_REVIEW',
+      actor: approvedBy,
+      caseId,
+      payload: {
+        approved: true,
+        ceilingPaise: authority.thresholds.human_approval_required_above_paise,
+      },
+    })
+    ports.logger.info('case_approved', { caseId, approvedBy })
+    return 'APPROVED'
+  }
+
   return {
     restore: () => banditStore.load(bandit),
     ingest,
     tick,
+    approve,
     clock: ports.clock,
     detector,
     bandit,

@@ -5,9 +5,13 @@ import { loadAuthority } from '../src/core/config-files'
 import { VirtualClock } from '../src/core/clock'
 import { createIdFactory } from '../src/core/identifiers'
 import { createLogger } from '../src/core/logger'
+import { paise } from '../src/core/money'
 import type { DatabaseHandle } from '../src/db/client'
-import { contactEvents, promises, riskCases } from '../src/db/schema'
+import { contactEvents, ledgerEvents, promises, riskCases } from '../src/db/schema'
+import { ContextBuilder } from '../src/engine/context-builder'
 import { InboundAgent } from '../src/inbound/agent'
+import { LedgerRepository } from '../src/ledger/ledger'
+import { evaluateStopGate } from '../src/policy/stop-gate'
 import { createTestDatabase, seedCase, seedMerchant } from './helpers/database'
 
 const authority = loadAuthority()
@@ -204,5 +208,45 @@ describe('InboundAgent: disputes and hardship', () => {
 
     expect(stats.optOuts).toBe(1)
     expect((await caseRow())?.state).toBe('OPEN')
+  })
+
+  it('stops automation on the other cases of a customer who replied in distress', async () => {
+    const first = await caseRow()
+    if (first === undefined) throw new Error('seeded case missing')
+    await handle.db.insert(riskCases).values({ ...first, id: 'case_obl_2' })
+    await handle.db.insert(ledgerEvents).values({
+      id: 'ledger_case_obl_2',
+      caseId: 'case_obl_2',
+      merchantId: MERCHANT,
+      type: 'CHARGE',
+      amountPaise: first.amountPaise,
+      at: 0,
+      createdAt: 0,
+    })
+
+    await reply('I lost my job last month, please give me time')
+    await agent.process(2_000)
+
+    const builder = new ContextBuilder(
+      handle.db,
+      new VirtualClock({ start: 3_000 }),
+      new LedgerRepository(handle.db, createIdFactory('context-test')),
+      () => ({
+        bankHolidays: new Set(),
+        pausedCohorts: new Set(),
+        killSwitchEngaged: false,
+        merchantPaused: false,
+        isFestival: () => false,
+      }),
+    )
+    const other = await builder.load('case_obl_2')
+    if (other === undefined) throw new Error('second case missing')
+    const stop = evaluateStopGate(
+      builder.stopContext(other, 'SEND_NUDGE', paise(10_000)),
+      authority,
+    )
+
+    expect(stop.verdict).toBe('STOP')
+    expect(stop.evaluations.find((e) => e.ruleId === 'STOP_VULNERABILITY')?.verdict).toBe('STOP')
   })
 })

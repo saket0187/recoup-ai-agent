@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, lt, lte } from 'drizzle-orm'
 
 import { paise, type Paise } from '../core/money'
 import type { Clock } from '../core/clock'
@@ -56,6 +56,8 @@ export interface CaseView {
   readonly caseAgeDays: number
   readonly cohortPaused: boolean
   readonly mandateCapPaise: Paise | undefined
+  readonly distressSignalled: boolean
+  readonly abuseSignalled: boolean
 }
 
 const PREFETCH_CHUNK = 400
@@ -113,7 +115,7 @@ export class ContextBuilder {
       (await this.db.select().from(customers).where(eq(customers.id, row.customerId)).limit(1))[0]
     if (customer === undefined) return undefined
 
-    const [outstanding, billed, consents, touches, diagnosis, history, promise, priors] =
+    const [outstanding, billed, consents, touches, diagnosis, history, promise, priors, signals] =
       await Promise.all([
         this.ledger.outstanding(caseId),
         this.billedTotal(caseId),
@@ -123,6 +125,7 @@ export class ContextBuilder {
         this.actionHistory(caseId),
         this.activePromise(caseId),
         this.paymentHistory(row.customerId, caseId, at),
+        this.inboundSignals(row.customerId, at),
       ])
 
     const [method, issuer] = (row.cohortId ?? '|').split('|')
@@ -154,6 +157,8 @@ export class ContextBuilder {
       cohortPaused: row.cohortId !== null && this.facts().pausedCohorts.has(row.cohortId),
       mandateCapPaise:
         customer.mandateCapPaise === null ? undefined : paise(customer.mandateCapPaise),
+      distressSignalled: signals.distress,
+      abuseSignalled: signals.abuse,
     }
   }
 
@@ -201,7 +206,7 @@ export class ContextBuilder {
       discountPct: extras.discountPct,
       discountPaise: undefined,
       extensionDays: extras.extensionDays,
-      humanApproved: false,
+      humanApproved: view.row.humanApprovedAt !== null,
       content,
       modelPayload: extras.modelPayload,
     }
@@ -216,12 +221,12 @@ export class ContextBuilder {
       outstandingPaise: view.outstandingPaise,
       originalAmountPaise: view.billedPaise,
       disputeOpen: view.row.disputeOpenedAt !== null,
-      invoiceDisputed: false,
+      invoiceDisputed: view.row.type === 'INVOICE_OVERDUE' && view.row.disputeOpenedAt !== null,
       optedOut: view.customer.optedOutGlobal,
       wrongPerson: view.customer.contactDataSuspect,
       deceased: view.customer.deceased,
-      distressSignalled: false,
-      abuseSignalled: false,
+      distressSignalled: view.distressSignalled,
+      abuseSignalled: view.abuseSignalled,
       retriesExcludingInfra: view.retriesExcludingInfra,
       touchCount: view.row.touchCount,
       bestRemainingEvPaise,
@@ -308,6 +313,28 @@ export class ContextBuilder {
     }
 
     return { byChannel24h, case7d, customer7d, lastTouchAt, lastInboundAt }
+  }
+
+  private async inboundSignals(
+    customerId: string,
+    at: number,
+  ): Promise<{ distress: boolean; abuse: boolean }> {
+    const rows = await this.db
+      .select({ intent: contactEvents.intent })
+      .from(contactEvents)
+      .where(
+        and(
+          eq(contactEvents.customerId, customerId),
+          eq(contactEvents.direction, 'INBOUND'),
+          inArray(contactEvents.intent, ['DISTRESS', 'ABUSE']),
+          lte(contactEvents.sentAt, at),
+        ),
+      )
+
+    return {
+      distress: rows.some((event) => event.intent === 'DISTRESS'),
+      abuse: rows.some((event) => event.intent === 'ABUSE'),
+    }
   }
 
   private async latestDiagnosis(caseId: string) {

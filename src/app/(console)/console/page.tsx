@@ -4,7 +4,7 @@ import { excludesZero } from '../../../core/statistics'
 import { Sparkline } from '../../components/charts'
 import { Odometer } from '../../components/odometer'
 import { Term } from '../../components/term'
-import { auditSummary, caseList, measurement, consoleState } from '../../lib/console-data'
+import { auditSummary, caseTotals, measurement, consoleState } from '../../lib/console-data'
 
 import { FirstRun } from '../../components/first-run'
 
@@ -37,34 +37,25 @@ export default async function MoneyBoard(): Promise<React.ReactElement> {
     )
   }
 
-  const [result, cases, audit] = await Promise.all([measurement(), caseList(2000), auditSummary()])
+  const [result, totals, audit] = await Promise.all([measurement(), caseTotals(), auditSummary()])
   const seed = getConfig().seed
   const inSample = state.model?.inSample === true
 
   const fraction = result.incrementalRecoveredFraction
   const significant = excludesZero(fraction)
-  const atRisk = cases
-    .filter((row) => row.state !== 'RECOVERED' && row.state !== 'WRITTEN_OFF')
-    .reduce((sum, row) => sum + row.amountPaise - row.recoveredPaise, 0)
-
-  const recovered = cases.reduce((sum, row) => sum + row.recoveredPaise, 0)
-  const billed = cases.reduce((sum, row) => sum + row.amountPaise, 0)
+  const atRisk = totals.atRiskPaise
+  const recovered = totals.recoveredPaise
+  const billed = totals.billedPaise
 
   const funnel = [
-    { label: 'Cases opened', value: cases.length },
-    { label: 'Diagnosed', value: cases.filter((row) => row.failureClass !== 'UNKNOWN').length },
-    { label: 'Contacted', value: cases.filter((row) => row.touchCount > 0).length },
-    { label: 'Recovered', value: cases.filter((row) => row.state === 'RECOVERED').length },
+    { label: 'Cases opened', value: totals.cases },
+    { label: 'Diagnosed', value: totals.diagnosed },
+    { label: 'Contacted', value: totals.contacted },
+    { label: 'Recovered', value: totals.recoveredCases },
   ]
   const funnelTop = Math.max(1, funnel[0]?.value ?? 1)
 
-  const byDay = new Map<number, number>()
-  for (const row of cases) {
-    if (row.resolvedAt === null) continue
-    const day = Math.floor(row.resolvedAt / 86_400_000)
-    byDay.set(day, (byDay.get(day) ?? 0) + row.recoveredPaise)
-  }
-  const series = [...byDay.entries()].sort(([a], [b]) => a - b).map(([, value]) => value / 100)
+  const series = totals.recoveredRupeesByDay
 
   return (
     <>
@@ -106,9 +97,9 @@ export default async function MoneyBoard(): Promise<React.ReactElement> {
                 <strong>Read this number with care.</strong> This batch uses seed{' '}
                 <span className="num">{seed}</span>, and the loaded model{' '}
                 <span className="num">{state.model?.version}</span> was fitted on that same seed. A
-                model always looks better on the data it learnt from. The honest figure comes from a
-                batch it has never seen: <span className="inline-code">npm run measure</span>, which
-                now defaults to a held-out seed and currently reports parity rather than a win.
+                model always looks better on the data it learnt from. The honest figure comes from
+                batches it has never seen: <span className="inline-code">npm run measure</span>,
+                which runs seven held-out seeds and currently has the agent ahead on five.
               </p>
             ) : null}
 
@@ -219,7 +210,7 @@ export default async function MoneyBoard(): Promise<React.ReactElement> {
               </p>
               <p className="plain" style={{ marginBottom: 0 }}>
                 <strong>The part that is checked against real data.</strong> The uplift machinery is
-                validated on the Hillstrom email trial, a genuine randomised experiment over 42,694
+                validated on the Hillstrom email trial, a genuine randomised experiment over 42,613
                 customers, where it recovers a known treatment effect. That tests the statistics,
                 not the payments domain, and the two claims are kept separate on purpose.
               </p>

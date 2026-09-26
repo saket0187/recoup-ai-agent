@@ -253,6 +253,14 @@ describe('consent rules', () => {
     expect(verdictOf('WA_SESSION_WINDOW', stale)).toBe('MODIFY')
     expect(verdictOf('WA_SESSION_WINDOW', context())).toBe('ALLOW')
   })
+
+  it('defers a send that needs both a template and a later hour, instead of sending it modified', () => {
+    const lateNight = fromIst(2026, 9, 15, 22)
+    const lateAndStale = context({ at: lateNight, lastInboundAt: lateNight - 30 * HOUR })
+    expect(verdictOf('WA_SESSION_WINDOW', lateAndStale)).toBe('MODIFY')
+    expect(verdictOf('QUIET_HOURS', lateAndStale)).toBe('DEFER')
+    expect(engine.evaluate(lateAndStale).verdict).toBe('DEFER')
+  })
 })
 
 describe('frequency rules', () => {
@@ -413,35 +421,69 @@ describe('data protection rules', () => {
 
 describe('money safety rules', () => {
   rule('PRE_DEBIT_NOTICE', 'defers a mandate debit until 24h after the notice', () => {
-    const noNotice = context({
-      action: 'RETRY_CHARGE',
+    const mandated = {
+      action: 'RETRY_CHARGE' as const,
       channel: undefined,
-      instrumentMethod: 'emandate',
-    })
+      mandateCapPaise: paise(1_000_000),
+    }
+
+    const noNotice = context({ ...mandated, instrumentMethod: 'emandate' })
     expect(verdictOf('PRE_DEBIT_NOTICE', noNotice)).toBe('DEFER')
 
     const tooSoon = context({
-      action: 'RETRY_CHARGE',
-      channel: undefined,
+      ...mandated,
       instrumentMethod: 'emandate',
       preDebitNoticeSentAt: TUESDAY_2PM - 2 * HOUR,
     })
     expect(verdictOf('PRE_DEBIT_NOTICE', tooSoon)).toBe('DEFER')
 
     const noticed = context({
-      action: 'RETRY_CHARGE',
-      channel: undefined,
+      ...mandated,
       instrumentMethod: 'emandate',
       preDebitNoticeSentAt: TUESDAY_2PM - 30 * HOUR,
     })
     expect(verdictOf('PRE_DEBIT_NOTICE', noticed)).toBe('ALLOW')
 
-    const cardRetry = context({
+    expect(verdictOf('PRE_DEBIT_NOTICE', context({ ...mandated, instrumentMethod: 'upi' }))).toBe(
+      'DEFER',
+    )
+    expect(verdictOf('PRE_DEBIT_NOTICE', context({ ...mandated, instrumentMethod: 'card' }))).toBe(
+      'DEFER',
+    )
+
+    const oneTimeCard = context({
       action: 'RETRY_CHARGE',
       channel: undefined,
       instrumentMethod: 'card',
     })
-    expect(verdictOf('PRE_DEBIT_NOTICE', cardRetry)).toBe('ALLOW')
+    expect(verdictOf('PRE_DEBIT_NOTICE', oneTimeCard)).toBe('ALLOW')
+  })
+
+  rule('MANDATE_REQUIRED', 'refuses to debit again without a standing mandate', () => {
+    const oneTime = context({ action: 'RETRY_CHARGE', channel: undefined, instrumentMethod: 'upi' })
+    expect(verdictOf('MANDATE_REQUIRED', oneTime)).toBe('DENY')
+
+    const autoPay = context({
+      action: 'RETRY_CHARGE',
+      channel: undefined,
+      instrumentMethod: 'upi',
+      mandateCapPaise: paise(1_000_000),
+    })
+    expect(verdictOf('MANDATE_REQUIRED', autoPay)).toBe('ALLOW')
+
+    const netbanking = context({
+      action: 'RETRY_CHARGE',
+      channel: undefined,
+      instrumentMethod: 'netbanking',
+      mandateCapPaise: paise(1_000_000),
+    })
+    expect(verdictOf('MANDATE_REQUIRED', netbanking)).toBe('DENY')
+
+    const noticeWithoutMandate = context({
+      action: 'SEND_PRE_DEBIT_NOTICE',
+      instrumentMethod: 'upi',
+    })
+    expect(verdictOf('MANDATE_REQUIRED', noticeWithoutMandate)).toBe('DENY')
   })
 
   rule('MANDATE_CAP', 'asks for a split rather than breaching the mandate cap', () => {

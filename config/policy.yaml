@@ -1,4 +1,4 @@
-policy_version: '2026.08.29-1'
+policy_version: '2026.09.25-1'
 
 rules:
   - id: QUIET_HOURS
@@ -241,9 +241,19 @@ rules:
     on_fail: DEFER
     params:
       notice_hours: 24
-      mandate_methods: [emandate, nach]
+      mandate_methods: [card, upi, emandate, nach]
     grounding:
-      - source: RBI e-mandate framework, pre-debit notification
+      - source: RBI Digital Payments E-mandate Framework 2026, pre-debit notification (cards, PPIs, UPI); NACH held to the same notice
+        human_verified: false
+
+  - id: MANDATE_REQUIRED
+    category: money_safety
+    applies_to: [RETRY_CHARGE, RETRY_CHARGE_ALT_ROUTE, SPLIT_RETRY, SEND_PRE_DEBIT_NOTICE]
+    on_fail: DENY
+    params:
+      mandate_methods: [card, upi, emandate, nach]
+    grounding:
+      - source: A merchant can only debit again under a standing mandate; without one the customer pays through a link
         human_verified: false
 
   - id: MANDATE_CAP
